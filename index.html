@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="description" content="BlockChain BailBonds - One-click emergency bail bonds service powered by blockchain technology.">
+  <title>918 Technologies - BlockChain BailBonds</title>
+  <!-- PWA requirements -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <link rel="apple-touch-icon" href="./icons/icon-192x192.svg">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    /* Base styles */
+    :root {
+      --primary: #1e40af;  /* Deep blue */
+      --primary-hover: #1e3a8a;
+      --accent: #f97316;   /* Orange for emergency */
+      --accent-hover: #ea580c;
+      --destructive: #dc2626;  /* Red for warnings */
+      --success: #16a34a;  /* Green for success */
+      --background: #f8fafc;
+      --foreground: #0f172a;
+      --card: #ffffff;
+      --card-foreground: #0f172a;
+      --border: #e2e8f0;
+      --muted: #f1f5f9;
+      --muted-foreground: #64748b;
+      --radius: 0.5rem;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+    }
+
+    .text-xs {
+      font-size: 0.75rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+    }
+
+    .text-xl {
+      font-size: 1.25rem;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+    }
+
+    .text-4xl {
+      font-size: 2.25rem;
+    }
+
+    .text-primary {
+      color: var(--primary);
+    }
+
+    .text-destructive {
+      color: var(--destructive);
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-muted {
+      color: var(--muted-foreground);
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    /* Layout */
+    .flex {
+      display: flex;
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-1 {
+      gap: 0.25rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .gap-3 {
+      gap: 0.75rem;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .gap-6 {
+      gap: 1.5rem;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+
+    .mb-8 {
+      margin-bottom: 2rem;
+    }
+
+    .mb-12 {
+      margin-bottom: 3rem;
+    }
+
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+
+    .ml-2 {
+      margin-left: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .p-4 {
+      padding: 1rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    /* Components */
+    .hidden {
+      display: none !important;
+    }
+
+    .card {
+      background-color: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      border-radius: var(--radius);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-destructive {
+      background-color: var(--destructive);
+      color: white;
+    }
+
+    .btn-destructive:hover:not(:disabled) {
+      background-color: #b91c1c;
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background-color: #15803d;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground);
+    }
+
+    .btn-outline:hover {
+      background-color: var(--muted);
+    }
+
+    .btn-emergency {
+      width: 16rem;
+      height: 16rem;
+      border-radius: 50%;
+      background-color: var(--destructive);
+      color: white;
+      font-weight: 700;
+      font-size: 1.5rem;
+      border: 8px solid white;
+      box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 30px rgba(220, 38, 38, 0.8);
+      }
+    }
+
+    .toast {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      padding: 1rem;
+      background-color: white;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      max-width: 350px;
+      animation: slideInRight 0.3s, fadeOut 0.3s 2.7s;
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+
+    .border-t {
+      border-top: 1px solid var(--border);
+    }
+
+    .border-b {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rounded {
+      border-radius: var(--radius);
+    }
+
+    .rounded-full {
+      border-radius: 9999px;
+    }
+
+    .bg-white {
+      background-color: white;
+    }
+
+    .bg-gray-100 {
+      background-color: #f3f4f6;
+    }
+
+    .w-full {
+      width: 100%;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+    }
+
+    .slide-in {
+      animation: slideIn 0.5s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Progress bar */
+    .progress-container {
+      height: 0.5rem;
+      width: 100%;
+      background-color: var(--muted);
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-value {
+      height: 100%;
+      background-color: var(--success);
+      transition: width 0.3s ease;
+    }
+
+    /* Map styling */
+    .map-container {
+      height: 300px;
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 1rem;
+      background-color: #e6f0fa;
+    }
+
+    .map-grid {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      background-image: linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px), 
+                        linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .jail-marker {
+      width: 1.5rem;
+      height: 1.5rem;
+      background-color: var(--destructive);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: all 0.2s;
+    }
+
+    .jail-marker:hover {
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    .jail-marker.selected {
+      background-color: var(--success);
+      transform: translate(-50%, -50%) scale(1.25);
+    }
+
+    /* Scanning log */
+    .scanning-log {
+      font-family: monospace;
+      height: 150px;
+      overflow-y: auto;
+      background-color: #1e1e1e;
+      color: #eee;
+      padding: 0.5rem;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      font-size: 0.8rem;
+    }
+
+    /* Step indicators */
+    .step-indicators {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .step {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      border: 2px solid;
+      margin: 0 0.25rem;
+    }
+
+    .step-line {
+      width: 3rem;
+      height: 2px;
+      background-color: var(--muted);
+    }
+
+    .step.active {
+      background-color: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .step.completed {
+      background-color: var(--success);
+      color: white;
+      border-color: var(--success);
+    }
+
+    .step.pending {
+      background-color: var(--muted);
+      color: var(--muted-foreground);
+      border-color: var(--muted);
+    }
+
+    .step-line.active {
+      background-color: var(--primary);
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      
+      .grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      
+      .grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      
+      .md\:flex-row {
+        flex-direction: row;
+      }
+      
+      .md\:text-left {
+        text-align: left;
+      }
+      
+      .md\:block {
+        display: block;
+      }
+      
+      .md\:hidden {
+        display: none;
+      }
+    }
+
+    @media (max-width: 767px) {
+      .hidden-mobile {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <!-- Header -->
+  <header class="bg-white border-b py-4 mb-6">
+    <div class="container flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="text-primary text-3xl">
+          <i class="fas fa-link-slash"></i>
+        </div>
+        <div>
+          <h2 class="text-primary mb-0">918 Technologies</h2>
+          <p class="text-xs text-muted">BlockChain BailBonds</p>
+        </div>
+      </div>
+      <div>
+        <nav>
+          <ul class="flex gap-4">
+            <li><a href="./index.html" class="text-primary font-medium">Home</a></li>
+            <li><a href="./bondsman-portal.html" class="text-primary">Bondsman Portal</a></li>
+            <li><a href="./domain-structure.html" class="text-primary">Domain Architecture</a></li>
+            <li><a href="./domain-wizard.html" class="text-primary">Connection Wizard</a></li>
+            <li><a href="./bail-contract-generator.html" class="text-primary">Contract Generator</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="hidden-mobile">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fas fa-phone text-primary"></i>
+            <span>24/7 Support: (918) 555-BAIL</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <i class="fas fa-shield text-primary"></i>
+            <span>Blockchain Secured</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container" style="min-height: calc(100vh - 200px);">
+    <!-- Home Page -->
+    <div id="home-page">
+      <div class="text-center mb-8">
+        <h1 class="text-primary">BlockChain BailBonds</h1>
+        <p class="text-lg text-muted mb-8">
+          One-touch emergency bail bonds service powered by blockchain technology.
+        </p>
+      </div>
+      
+      <!-- Emergency Button Section -->
+      <div id="emergency-button-container" class="flex justify-center mb-12">
+        <button id="emergency-button" class="btn-emergency">
+          <div class="flex flex-col items-center">
+            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+            <span class="text-lg">I'm Going To</span>
+            <span class="text-3xl font-bold">JAIL!</span>
+          </div>
+        </button>
+      </div>
+      
+      <!-- Permissions and User Info Section -->
+      <div id="permissions-section" class="hidden slide-in mb-12 card" style="border: 4px solid var(--destructive);">
+        <div class="mb-6 text-center">
+          <h2 class="text-destructive mb-2">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            EMERGENCY MODE ACTIVE
+          </h2>
+          <p class="text-muted">
+            Grant permissions and provide your information to begin the automatic bail process.
+          </p>
+        </div>
+        
+        <div class="space-y-6 mb-6">
+          <div class="flex items-center justify-between bg-gray-100 p-4 rounded">
+            <div class="flex items-center gap-3">
+              <div class="text-primary text-xl">
+                <i class="fas fa-map-marker-alt"></i>
+              </div>
+              <div>
+                <h3 class="font-medium">Location Access</h3>
+                <p class="text-xs text-muted">
+                  Required to find the nearest jail facility
+                </p>
+              </div>
+            </div>
+            <button id="grant-location-btn" class="btn btn-primary">
+              Grant Access
+            </button>
+          </div>
+          
+          <div class="flex items-center justify-between bg-gray-100 p-4 rounded">
+            <div class="flex items-center gap-3">
+              <div class="text-primary text-xl">
+                <i class="fas fa-wallet"></i>
+              </div>
+              <div>
+                <h3 class="font-medium">Wallet Access</h3>
+                <p class="text-xs text-muted">
+                  Required for blockchain verification and payment
+                </p>
+              </div>
+            </div>
+            <button id="grant-wallet-btn" class="btn btn-primary">
+              Grant Access
+            </button>
+          </div>
+        </div>
+        
+        <div id="user-info-form" class="hidden border-t pt-4">
+          <form id="emergency-form">
+            <div>
+              <h3 class="font-medium text-center mb-4">Provide Your Information</h3>
+              
+              <div>
+                <label for="fullName" class="text-sm font-medium">
+                  Full Legal Name
+                </label>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  placeholder="Enter your full legal name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label for="birthYear" class="text-sm font-medium">
+                  Birth Year
+                </label>
+                <input
+                  id="birthYear"
+                  name="birthYear"
+                  placeholder="YYYY"
+                  required
+                  maxlength="4"
+                  pattern="[0-9]{4}"
+                />
+              </div>
+              
+              <div>
+                <button
+                  type="submit"
+                  class="btn btn-destructive w-full"
+                >
+                  <i class="fas fa-exclamation-circle mr-2"></i>
+                  Start Emergency Bail Process
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- Processing Section (Shown after form submit) -->
+      <div id="processing-section" class="hidden slide-in mb-12 card" style="border: 4px solid var(--primary); text-align: center;">
+        <i class="fas fa-spinner fa-spin text-5xl text-primary mb-6"></i>
+        <h2 class="mb-4">Processing Your Emergency Request</h2>
+        <div style="max-width: 500px; margin: 0 auto;">
+          <div class="mb-6">
+            <div class="progress-container">
+              <div id="progress-bar" class="progress-value" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span>Processing</span>
+              <span id="progress-percent">0% Complete</span>
+            </div>
+          </div>
+          <p id="processing-status" class="text-muted mb-4">Initializing emergency protocol...</p>
+          <div class="scanning-log" id="scanning-log">
+            > Emergency mode activated<br>
+            > Accessing location data...<br>
+            > Searching for nearby detention facilities...<br>
+          </div>
+          <p class="text-xs text-muted">Please wait while we locate you and scan booking websites. Do not close this window.</p>
+        </div>
+      </div>
+      
+      <!-- Features Section -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div class="card">
+          <div class="text-primary text-2xl mb-4 flex justify-center">
+            <i class="fas fa-bolt"></i>
+          </div>
+          <h3 class="text-center mb-2">One-Touch Activation</h3>
+          <p class="text-sm text-center text-muted">
+            Press one button to automatically start the bail process when you're in trouble.
+          </p>
+        </div>
+        
+        <div class="card">
+          <div class="text-primary text-2xl mb-4 flex justify-center">
+            <i class="fas fa-link"></i>
+          </div>
+          <h3 class="text-center mb-2">Blockchain Secured</h3>
+          <p class="text-sm text-center text-muted">
+            All contracts are deployed on blockchain for maximum security and transparency.
+          </p>
+        </div>
+        
+        <div class="card">
+          <div class="text-primary text-2xl mb-4 flex justify-center">
+            <i class="fas fa-search-location"></i>
+          </div>
+          <h3 class="text-center mb-2">Auto-Location</h3>
+          <p class="text-sm text-center text-muted">
+            System automatically finds the nearest jail facility based on your current location.
+          </p>
+        </div>
+      </div>
+      
+      <!-- How It Works -->
+      <div class="bg-gray-100 p-6 rounded mb-8">
+        <h3 class="text-center mb-4">How It Works</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div class="flex flex-col items-center text-center">
+            <div style="width: 4rem; height: 4rem; background-color: var(--destructive); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 1rem;">
+              <i class="fas fa-exclamation-triangle text-2xl"></i>
+            </div>
+            <p class="font-medium">Emergency Button</p>
+            <p class="text-xs text-muted">Press when you're about to be detained</p>
+          </div>
+          
+          <div class="flex flex-col items-center text-center">
+            <div style="width: 4rem; height: 4rem; background-color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 1rem;">
+              <i class="fas fa-database text-2xl"></i>
+            </div>
+            <p class="font-medium">Auto-Scanning</p>
+            <p class="text-xs text-muted">System scans jail booking sites for your info</p>
+          </div>
+          
+          <div class="flex flex-col items-center text-center">
+            <div style="width: 4rem; height: 4rem; background-color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 1rem;">
+              <i class="fas fa-user-tie text-2xl"></i>
+            </div>
+            <p class="font-medium">Bondsman Alert</p>
+            <p class="text-xs text-muted">Notifies available bondsmen in the area</p>
+          </div>
+          
+          <div class="flex flex-col items-center text-center">
+            <div style="width: 4rem; height: 4rem; background-color: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 1rem;">
+              <i class="fas fa-file-contract text-2xl"></i>
+            </div>
+            <p class="font-medium">Blockchain Contract</p>
+            <p class="text-xs text-muted">Secure contract deployed on blockchain</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Legal Disclaimer -->
+      <div class="text-xs text-muted text-center mb-8">
+        <p>
+          NOTICE: This application is intended for use only in jurisdictions where bail bonds are legal. 
+          By using this service, you agree to our terms and conditions.
+          The "I'm Going To JAIL!" button should only be pressed in genuine situations where you anticipate detention.
+        </p>
+      </div>
+    </div>
+
+    <!-- Jail Selection Page (Hidden initially) -->
+    <div id="jail-selection-page" class="hidden">
+      <!-- Step indicator -->
+      <div class="step-indicators">
+        <div class="step completed">
+          <i class="fas fa-check"></i>
+        </div>
+        <div class="step-line active"></div>
+        <div class="step active">2</div>
+        <div class="step-line"></div>
+        <div class="step pending">3</div>
+        <div class="step-line"></div>
+        <div class="step pending">4</div>
+        <div class="step-line"></div>
+        <div class="step pending">5</div>
+      </div>
+
+      <h1 class="text-primary mb-6">Select Detention Facility</h1>
+      
+      <div class="mb-6">
+        <div class="bg-gray-100 p-4 rounded mb-6">
+          <div class="flex items-center gap-3 mb-2">
+            <div style="width: 2.5rem; height: 2.5rem; background-color: rgba(30, 64, 175, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center">
+              <i class="fas fa-info text-primary"></i>
+            </div>
+            <div>
+              <h3 class="font-medium">User Information</h3>
+              <p class="text-sm text-muted" id="user-info-display">
+                Searching for <span id="user-name-display"></span>
+              </p>
+            </div>
+          </div>
+          <p class="text-sm">
+            Based on your location, we've identified several detention facilities nearby. 
+            Please select the facility where the inmate is being held.
+          </p>
+        </div>
+        
+        <!-- Mock Map -->
+        <div class="map-container" id="mock-map">
+          <!-- Map grid lines with CSS background -->
+          <div class="map-grid"></div>
+          
+          <!-- User location marker -->
+          <div style="width: 1.5rem; height: 1.5rem; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10;">
+            <i class="fas fa-user-circle"></i>
+          </div>
+          
+          <!-- Jail markers (dynamically populated by JavaScript) -->
+          <div id="jail-markers-container"></div>
+          
+          <!-- Map attribution -->
+          <div style="position: absolute; bottom: 0.25rem; right: 0.25rem; font-size: 0.625rem; color: #64748b;">
+            Map Data © 918 Technologies 2024
+          </div>
+        </div>
+        
+        <!-- Jails List -->
+        <div class="mt-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-medium">Nearby Detention Facilities</h3>
+            <div class="flex items-center gap-2 text-sm">
+              <span>Sort by:</span>
+              <div style="display: flex; border: 1px solid var(--border); border-radius: var(--radius);">
+                <button id="sort-by-distance" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background-color: var(--primary); color: white;">
+                  Distance
+                </button>
+                <button id="sort-by-processing" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background-color: var(--muted);">
+                  Processing Time
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="jails-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Jail cards will be dynamically inserted here -->
+          </div>
+        </div>
+        
+        <div class="mt-8 flex justify-between">
+          <button id="jail-back-btn" class="btn btn-outline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back
+          </button>
+          
+          <button id="jail-continue-btn" class="btn btn-primary" disabled>
+            Continue
+            <i class="fas fa-arrow-right ml-2"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Found Screen (Final) -->
+    <div id="found-screen" class="hidden">
+      <div class="text-center py-6">
+        <div class="text-6xl text-success mb-6">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2 class="mb-4">Bondsman Notified!</h2>
+        <p class="text-xl mb-8">
+          Your information has been verified and a contract has been generated.
+        </p>
+        <div class="card mx-auto" style="max-width: 32rem; text-align: left;">
+          <h3 class="font-bold text-xl mb-4">Contract Details</h3>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <p class="text-xs text-muted mb-1">Contract ID</p>
+              <p class="font-medium">CONT-2024051701</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted mb-1">Created</p>
+              <p class="font-medium">May 17, 2024 - 3:15 PM</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted mb-1">Total Bail Amount</p>
+              <p class="font-medium">$30,000</p>
+            </div>
+            <div>
+              <p class="text-xs text-muted mb-1">Bond Fee (10%)</p>
+              <p class="font-medium">$3,000</p>
+            </div>
+          </div>
+          <hr style="margin: 1rem 0; border: 0; border-top: 1px solid var(--border);">
+          <div class="mb-4">
+            <p class="font-medium text-xs mb-2">Assigned Bondsman</p>
+            <div class="flex items-center gap-3">
+              <div style="width: 2.5rem; height: 2.5rem; background-color: rgba(30, 64, 175, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center">
+                <i class="fas fa-user text-primary"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium">Alex Johnson</p>
+                <p class="text-xs text-muted">Freedom Bail Bonds</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-4 justify-center mt-6">
+          <button id="start-over-btn" class="btn btn-outline">
+            <i class="fas fa-redo mr-2"></i>
+            Start Over
+          </button>
+          <button class="btn btn-primary">
+            <i class="fas fa-download mr-2"></i>
+            Download Contract
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 mt-8 border-t text-sm text-muted bg-white">
+    <div class="container">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          &copy; <span id="current-year"></span> 918 Technologies Inc. All rights reserved.
+        </div>
+        <div class="flex gap-4">
+          <a href="#" class="text-primary">Terms</a>
+          <a href="#" class="text-primary">Privacy</a>
+          <a href="#" class="text-primary">Support</a>
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-center md:text-left">
+        <p>DISCLAIMER: This is a prototype demonstration. No real bail bonds are processed through this interface.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    // Mock jail data
+    const mockJails = [
+      {
+        id: 1,
+        name: "Central County Detention Facility",
+        address: "123 Justice Ave, Central City, CA 90001",
+        phone: "(555) 123-4567",
+        coordinates: { left: "45%", top: "48%" },
+        distance: 1.2,
+        processingTime: "30-60 minutes",
+        capacity: "85%",
+        bookingsToday: 24
+      },
+      {
+        id: 2,
+        name: "Eastside Correctional Center",
+        address: "456 Law St, East District, CA 90011",
+        phone: "(555) 234-5678",
+        coordinates: { left: "65%", top: "40%" },
+        distance: 2.8,
+        processingTime: "45-75 minutes",
+        capacity: "72%",
+        bookingsToday: 18
+      },
+      {
+        id: 3,
+        name: "Westside Municipal Jail",
+        address: "789 Order Blvd, West City, CA 90024",
+        phone: "(555) 345-6789",
+        coordinates: { left: "30%", top: "55%" },
+        distance: 3.5,
+        processingTime: "20-40 minutes",
+        capacity: "65%",
+        bookingsToday: 15
+      },
+      {
+        id: 4,
+        name: "Northern County Correctional Facility",
+        address: "101 Legal Way, North Town, CA 90042",
+        phone: "(555) 456-7890",
+        coordinates: { left: "52%", top: "30%" },
+        distance: 4.2,
+        processingTime: "60-90 minutes",
+        capacity: "90%",
+        bookingsToday: 32
+      },
+      {
+        id: 5,
+        name: "Southern District Holding Center",
+        address: "202 Custody Ln, South City, CA 90037",
+        phone: "(555) 567-8901",
+        coordinates: { left: "40%", top: "65%" },
+        distance: 5.1,
+        processingTime: "35-55 minutes",
+        capacity: "78%",
+        bookingsToday: 21
+      }
+    ];
+
+    // Mock contract information
+    const mockContractInfo = {
+      contractId: "CONT-2024051701",
+      created: "May 17, 2024 - 3:15 PM",
+      expiresAt: "May 17, 2024 - 11:59 PM",
+      issuer: "918 Technologies Automated System",
+      fee: 3000, // 10% of total bail amount
+      paymentPlan: {
+        initialPayment: 1000,
+        monthlyPayment: 500,
+        numberOfMonths: 4
+      },
+      bondsman: {
+        id: 101,
+        name: "Alex Johnson",
+        company: "Freedom Bail Bonds",
+        license: "BB1234567",
+        phone: "(555) 987-6543"
+      }
+    };
+
+    // User session data
+    let userSession = {
+      fullName: "",
+      birthYear: "",
+      selectedJail: null
+    };
+
+    // Set current year in footer
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // DOM Elements
+    const emergencyButton = document.getElementById('emergency-button');
+    const permissionsSection = document.getElementById('permissions-section');
+    const grantLocationBtn = document.getElementById('grant-location-btn');
+    const grantWalletBtn = document.getElementById('grant-wallet-btn');
+    const userInfoForm = document.getElementById('user-info-form');
+    const emergencyForm = document.getElementById('emergency-form');
+    const processingSection = document.getElementById('processing-section');
+    const homePage = document.getElementById('home-page');
+    const jailSelectionPage = document.getElementById('jail-selection-page');
+    const foundScreen = document.getElementById('found-screen');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const processingStatus = document.getElementById('processing-status');
+    const scanningLog = document.getElementById('scanning-log');
+    const jailsListContainer = document.getElementById('jails-list');
+    const jailMarkersContainer = document.getElementById('jail-markers-container');
+    const sortByDistance = document.getElementById('sort-by-distance');
+    const sortByProcessing = document.getElementById('sort-by-processing');
+    const jailBackBtn = document.getElementById('jail-back-btn');
+    const jailContinueBtn = document.getElementById('jail-continue-btn');
+    const userNameDisplay = document.getElementById('user-name-display');
+    const startOverBtn = document.getElementById('start-over-btn');
+
+    // Current sort method
+    let currentSort = "distance";
+    // Selected jail ID
+    let selectedJailId = null;
+
+    // Show toast notification
+    function showToast(title, message, variant = "default") {
+      const toastContainer = document.getElementById('toast-container');
+      
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      if (variant === "destructive") {
+        toast.style.borderLeft = "4px solid var(--destructive)";
+      } else if (variant === "success") {
+        toast.style.borderLeft = "4px solid var(--success)";
+      } else {
+        toast.style.borderLeft = "4px solid var(--primary)";
+      }
+      
+      toast.innerHTML = `
+        <div class="font-semibold">${title}</div>
+        <div class="text-sm text-muted">${message}</div>
+      `;
+      
+      toastContainer.appendChild(toast);
+      
+      // Remove toast after 3 seconds
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // Emergency button click
+    emergencyButton.addEventListener('click', () => {
+      document.getElementById('emergency-button-container').classList.add('hidden');
+      permissionsSection.classList.remove('hidden');
+      showToast("EMERGENCY MODE ACTIVATED", "Please grant permissions to continue...", "destructive");
+    });
+
+    // Grant location permission
+    grantLocationBtn.addEventListener('click', () => {
+      grantLocationBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Granted';
+      grantLocationBtn.style.backgroundColor = "rgba(22, 163, 74, 0.1)";
+      grantLocationBtn.style.color = "var(--success)";
+      grantLocationBtn.disabled = true;
+      
+      showToast("Location Access Granted", "Your location is being used to find the nearest jail facility.");
+      
+      // Check if both permissions granted
+      if (grantLocationBtn.disabled && grantWalletBtn.disabled) {
+        userInfoForm.classList.remove('hidden');
+      }
+    });
+
+    // Grant wallet permission
+    grantWalletBtn.addEventListener('click', () => {
+      grantWalletBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Granted';
+      grantWalletBtn.style.backgroundColor = "rgba(22, 163, 74, 0.1)";
+      grantWalletBtn.style.color = "var(--success)";
+      grantWalletBtn.disabled = true;
+      
+      showToast("Wallet Access Granted", "Your wallet will be used for blockchain verification and payment.");
+      
+      // Check if both permissions granted
+      if (grantLocationBtn.disabled && grantWalletBtn.disabled) {
+        userInfoForm.classList.remove('hidden');
+      }
+    });
+
+    // Handle form submission
+    emergencyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      // Get form data
+      const formData = new FormData(emergencyForm);
+      userSession.fullName = formData.get('fullName');
+      userSession.birthYear = formData.get('birthYear');
+      
+      // Show processing screen with final confirmation message
+      permissionsSection.classList.add('hidden');
+      
+      // Create final confirmation div
+      const finalConfirmation = document.createElement('div');
+      finalConfirmation.className = 'card slide-in';
+      finalConfirmation.style.border = '4px solid var(--success)';
+      finalConfirmation.style.textAlign = 'center';
+      finalConfirmation.style.padding = '2rem';
+      finalConfirmation.innerHTML = `
+        <div class="text-5xl text-success mb-6">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2 class="text-2xl font-bold mb-4">Emergency Protocol Activated</h2>
+        <p class="mb-4">Your information has been received and the 918 Technologies BlockChain BailBonds system is now active.</p>
+        <div class="bg-gray-100 p-4 rounded text-left mb-6">
+          <h3 class="font-medium mb-2">What happens next:</h3>
+          <ol style="list-style-type: decimal; margin-left: 1.5rem;">
+            <li class="mb-2">Once you are processed at a detention facility, our system will automatically detect your booking.</li>
+            <li class="mb-2">Your location data is being used to monitor jail booking databases in your area.</li>
+            <li class="mb-2">When your info appears in the system, a bail bond contract will be automatically generated.</li>
+            <li class="mb-2">Available bondsmen will be notified and the first to respond will handle your case.</li>
+            <li class="mb-2">The bondsman will contact the jail directly to arrange your release.</li>
+          </ol>
+        </div>
+        <div class="text-sm text-muted mb-6">
+          <p>No further action is required from you. This system will continuously monitor jail booking information using the data you provided.</p>
+          <p class="mt-2"><strong>Name:</strong> ${userSession.fullName} | <strong>Birth Year:</strong> ${userSession.birthYear}</p>
+        </div>
+        <p class="text-sm bg-destructive/10 text-destructive p-3 rounded">
+          <i class="fas fa-info-circle mr-2"></i>You can now close this window. The process will continue automatically in our system.
+        </p>
+      `;
+      
+      // Replace the main content with the final confirmation
+      const mainContent = document.querySelector('main');
+      mainContent.innerHTML = '';
+      mainContent.appendChild(finalConfirmation);
+      
+      // Save the session in localStorage (in a real app, this would be sent to a server)
+      localStorage.setItem('bailBondsEmergencySession', JSON.stringify({
+        fullName: userSession.fullName,
+        birthYear: userSession.birthYear,
+        activated: true,
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Show a toast notification
+      showToast("Emergency Protocol Activated", "Your information has been registered in the system.", "success");
+    });
+
+    // Initialize jail selection page
+    function initJailSelection() {
+      // Disable continue button initially
+      jailContinueBtn.disabled = true;
+      
+      // Render jail markers on map
+      renderJailMarkers();
+      
+      // Render jail list based on current sort
+      renderJailsList();
+    }
+
+    // Render jail markers on map
+    function renderJailMarkers() {
+      jailMarkersContainer.innerHTML = "";
+      
+      mockJails.forEach(jail => {
+        const marker = document.createElement('div');
+        marker.className = `jail-marker ${jail.id === selectedJailId ? 'selected' : ''}`;
+        marker.style.left = jail.coordinates.left;
+        marker.style.top = jail.coordinates.top;
+        
+        marker.innerHTML = `<i class="fas fa-building-shield"></i>`;
+        
+        // Marker click event
+        marker.addEventListener('click', () => {
+          selectJail(jail.id);
+        });
+        
+        jailMarkersContainer.appendChild(marker);
+      });
+    }
+
+    // Render jails list based on current sort
+    function renderJailsList() {
+      // Sort jails
+      const sortedJails = [...mockJails].sort((a, b) => {
+        if (currentSort === "distance") {
+          return a.distance - b.distance;
+        } else {
+          // Extract minutes from processing time and sort by the lower bound
+          const aTime = parseInt(a.processingTime.split("-")[0]);
+          const bTime = parseInt(b.processingTime.split("-")[0]);
+          return aTime - bTime;
+        }
+      });
+      
+      // Clear container
+      jailsListContainer.innerHTML = "";
+      
+      // Add jail cards
+      sortedJails.forEach(jail => {
+        const isSelected = jail.id === selectedJailId;
+        
+        const card = document.createElement('div');
+        card.className = 'card';
+        if (isSelected) {
+          card.style.borderColor = 'var(--primary)';
+          card.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+        }
+        
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-medium">${jail.name}</h3>
+              ${isSelected ? '<span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; background-color: rgba(22, 163, 74, 0.2); color: var(--success); border-radius: 9999px;">Selected</span>' : ''}
+            </div>
+            <p class="text-xs text-muted mb-3">${jail.address}</p>
+            <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+              <div class="flex items-center gap-1">
+                <i class="fas fa-route text-primary"></i>
+                <span>${jail.distance} miles away</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-clock text-primary"></i>
+                <span>${jail.processingTime}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-users text-primary"></i>
+                <span>Capacity: ${jail.capacity}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-calendar-day text-primary"></i>
+                <span>${jail.bookingsToday} bookings today</span>
+              </div>
+            </div>
+            <button class="btn w-full ${isSelected ? 'btn-success' : 'btn-primary'}">
+              ${isSelected ? 'Selected' : 'Select This Facility'}
+            </button>
+          </div>
+        `;
+        
+        // Card click event
+        card.addEventListener('click', () => {
+          selectJail(jail.id);
+        });
+        
+        jailsListContainer.appendChild(card);
+      });
+    }
+
+    // Handle jail selection
+    function selectJail(jailId) {
+      selectedJailId = jailId;
+      
+      // Save selected jail to session
+      userSession.selectedJail = mockJails.find(jail => jail.id === jailId);
+      
+      // Enable continue button
+      jailContinueBtn.disabled = false;
+      
+      // Update UI
+      renderJailMarkers();
+      renderJailsList();
+      
+      showToast("Facility Selected", `${userSession.selectedJail.name} has been selected.`, "success");
+    }
+
+    // Sort buttons
+    sortByDistance.addEventListener('click', () => {
+      currentSort = "distance";
+      sortByDistance.style.backgroundColor = 'var(--primary)';
+      sortByDistance.style.color = 'white';
+      sortByProcessing.style.backgroundColor = 'var(--muted)';
+      sortByProcessing.style.color = 'var(--foreground)';
+      renderJailsList();
+    });
+
+    sortByProcessing.addEventListener('click', () => {
+      currentSort = "processingTime";
+      sortByProcessing.style.backgroundColor = 'var(--primary)';
+      sortByProcessing.style.color = 'white';
+      sortByDistance.style.backgroundColor = 'var(--muted)';
+      sortByDistance.style.color = 'var(--foreground)';
+      renderJailsList();
+    });
+
+    // Back button
+    jailBackBtn.addEventListener('click', () => {
+      jailSelectionPage.classList.add('hidden');
+      processingSection.classList.add('hidden');
+      permissionsSection.classList.remove('hidden');
+      homePage.classList.remove('hidden');
+    });
+
+    // Continue button
+    jailContinueBtn.addEventListener('click', () => {
+      if (!selectedJailId) {
+        showToast("Please select a facility", "You must select a detention facility to continue.", "destructive");
+        return;
+      }
+      
+      showToast("Processing", "Generating bail bond contract...", "default");
+      
+      // Show processing section again with contract generation
+      jailSelectionPage.classList.add('hidden');
+      processingSection.classList.remove('hidden');
+      
+      // Reset and restart progress
+      progressBar.style.width = "0%";
+      progressPercent.textContent = "0% Complete";
+      processingStatus.textContent = "Generating bail bond contract...";
+      scanningLog.innerHTML = "> Facility selected: " + userSession.selectedJail.name + "<br>";
+      scanningLog.innerHTML += "> Accessing inmate records...<br>";
+      
+      // Simulate contract generation
+      let progress = 0;
+      const simulateContractGen = setInterval(() => {
+        progress += 10;
+        progressBar.style.width = `${progress}%`;
+        progressPercent.textContent = `${progress}% Complete`;
+        
+        // Update status based on progress
+        if (progress === 20) {
+          processingStatus.textContent = "Verifying inmate information...";
+          scanningLog.innerHTML += "> Inmate record found<br>";
+          scanningLog.innerHTML += "> Charges: Burglary (2nd Degree), Possession of Stolen Property<br>";
+        } else if (progress === 40) {
+          processingStatus.textContent = "Calculating bail amount...";
+          scanningLog.innerHTML += "> Total bail amount: $30,000<br>";
+        } else if (progress === 60) {
+          processingStatus.textContent = "Finding available bondsmen...";
+          scanningLog.innerHTML += "> Searching for bondsmen near " + userSession.selectedJail.name + "<br>";
+          scanningLog.innerHTML += "> 3 bondsmen available within 10 miles<br>";
+        } else if (progress === 80) {
+          processingStatus.textContent = "Generating smart contract...";
+          scanningLog.innerHTML += "> Preparing blockchain contract<br>";
+          scanningLog.innerHTML += "> Contract ID: " + mockContractInfo.contractId + "<br>";
+        } else if (progress >= 100) {
+          clearInterval(simulateContractGen);
+          processingStatus.textContent = "Contract successfully generated!";
+          scanningLog.innerHTML += "> Bondsman notified: " + mockContractInfo.bondsman.name + " (" + mockContractInfo.bondsman.company + ")<br>";
+          scanningLog.innerHTML += "> Contract deployed to blockchain<br>";
+          
+          // Show final success screen
+          setTimeout(() => {
+            processingSection.classList.add('hidden');
+            foundScreen.classList.remove('hidden');
+          }, 1500);
+        }
+        
+        // Auto-scroll the scanning log
+        scanningLog.scrollTop = scanningLog.scrollHeight;
+      }, 500);
+    });
+
+    // Start over button
+    startOverBtn.addEventListener('click', () => {
+      foundScreen.classList.add('hidden');
+      homePage.classList.remove('hidden');
+      document.getElementById('emergency-button-container').classList.remove('hidden');
+      permissionsSection.classList.add('hidden');
+      userInfoForm.classList.add('hidden');
+      
+      // Reset user session
+      userSession = {
+        fullName: "",
+        birthYear: "",
+        selectedJail: null
+      };
+      
+      // Reset permissions
+      grantLocationBtn.innerHTML = 'Grant Access';
+      grantLocationBtn.style.backgroundColor = '';
+      grantLocationBtn.style.color = '';
+      grantLocationBtn.disabled = false;
+      
+      grantWalletBtn.innerHTML = 'Grant Access';
+      grantWalletBtn.style.backgroundColor = '';
+      grantWalletBtn.style.color = '';
+      grantWalletBtn.disabled = false;
+      
+      // Reset form
+      emergencyForm.reset();
+      
+      // Reset jail selection
+      selectedJailId = null;
+      
+      showToast("Reset Complete", "Starting a new bail bond request.", "success");
+    });
+  </script>
+  
+  <!-- Domain Connection Script -->
+  <script src="./domain-connector.js"></script>
+  
+  <!-- Domain Integration Script -->
+  <script>
+    // Initialize domain connection when document is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check if we're connected to all domains
+      if (window.Nine1Eight && window.Nine1Eight.domainState) {
+        console.log('Domain connector initialized on:', window.Nine1Eight.domainState.currentDomain);
+        
+        // Add domain status to emergency button if all domains are connected
+        const checkDomainsConnection = function() {
+          if (window.Nine1Eight.domainState.session.domainAccess.blockchain &&
+              window.Nine1Eight.domainState.session.domainAccess.crypto &&
+              window.Nine1Eight.domainState.session.domainAccess.nft &&
+              window.Nine1Eight.domainState.session.domainAccess.wallet &&
+              window.Nine1Eight.domainState.session.domainAccess.x) {
+            
+            // Show domains connected status
+            const emergencyBtn = document.getElementById('emergency-button');
+            if (emergencyBtn) {
+              const statusBadge = document.createElement('div');
+              statusBadge.className = 'domain-status-badge';
+              statusBadge.innerHTML = `
+                <i class="fas fa-check-circle"></i> All 5 Domains Connected
+              `;
+              emergencyBtn.appendChild(statusBadge);
+              
+              // Add connected class to button
+              emergencyBtn.classList.add('domains-connected');
+            }
+          }
+        };
+        
+        // Check domain connection
+        checkDomainsConnection();
+        
+        // Listen for session updates
+        document.addEventListener('sessionUpdated', function(event) {
+          checkDomainsConnection();
+        });
+        
+        // When emergency form is submitted, broadcast to all domains
+        const emergencyForm = document.getElementById('emergency-form');
+        if (emergencyForm) {
+          const originalSubmitHandler = emergencyForm.onsubmit;
+          
+          emergencyForm.addEventListener('submit', function(e) {
+            // If we have the domain connector, notify all domains
+            if (window.Nine1Eight && window.Nine1Eight.broadcastToAllDomains) {
+              // Get form data
+              const formData = new FormData(emergencyForm);
+              const emergencyData = {
+                fullName: formData.get('fullName'),
+                birthYear: formData.get('birthYear'),
+                timestamp: new Date().toISOString(),
+                location: userSession.location || { lat: 0, lng: 0 }
+              };
+              
+              // Broadcast emergency activation to all domains
+              window.Nine1Eight.broadcastToAllDomains('EMERGENCY_ACTIVATION', emergencyData);
+              console.log('Emergency activation broadcast to all domains:', emergencyData);
+            }
+          });
+        }
+      }
+    });
+  </script>
+  
+  <!-- Domain Status Badge Styles -->
+  <style>
+    .domain-status-badge {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      background-color: var(--success);
+      color: white;
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .domains-connected {
+      box-shadow: 0 0 0 3px var(--success), 0 10px 15px rgba(0,0,0,0.2);
+    }
+  </style>
+  
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+    
+    // Check if the app was installed as PWA
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        // App is running in standalone mode (installed as PWA)
+        document.body.classList.add('installed-pwa');
+        
+        // Add PWA indicator to header
+        const header = document.querySelector('header');
+        if (header) {
+          const pwaBadge = document.createElement('div');
+          pwaBadge.className = 'pwa-badge';
+          pwaBadge.innerHTML = '<i class="fas fa-mobile-alt"></i> Installed App';
+          pwaBadge.style.position = 'absolute';
+          pwaBadge.style.top = '0.5rem';
+          pwaBadge.style.right = '0.5rem';
+          pwaBadge.style.fontSize = '0.75rem';
+          pwaBadge.style.backgroundColor = 'rgba(22, 163, 74, 0.1)';
+          pwaBadge.style.color = 'var(--success)';
+          pwaBadge.style.padding = '0.25rem 0.5rem';
+          pwaBadge.style.borderRadius = '9999px';
+          header.style.position = 'relative';
+          header.appendChild(pwaBadge);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
