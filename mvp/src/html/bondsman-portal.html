@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="description" content="918 Technologies BlockChain BailBonds - Bondsman Portal for accessing the automated bail bonds service.">
+  <title>Bondsman Portal - 918 Technologies</title>
+  <!-- PWA requirements -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <link rel="apple-touch-icon" href="./icons/icon-192x192.svg">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    /* Base styles */
+    :root {
+      --primary: #1e40af;  /* Deep blue */
+      --primary-hover: #1e3a8a;
+      --accent: #f97316;   /* Orange for emphasis */
+      --accent-hover: #ea580c;
+      --destructive: #dc2626;  /* Red for warnings */
+      --success: #16a34a;  /* Green for success */
+      --background: #f8fafc;
+      --foreground: #0f172a;
+      --card: #ffffff;
+      --card-foreground: #0f172a;
+      --border: #e2e8f0;
+      --muted: #f1f5f9;
+      --muted-foreground: #64748b;
+      --radius: 0.5rem;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+    }
+
+    .text-xs {
+      font-size: 0.75rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+    }
+
+    .text-xl {
+      font-size: 1.25rem;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+    }
+
+    .text-primary {
+      color: var(--primary);
+    }
+
+    .text-destructive {
+      color: var(--destructive);
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-muted {
+      color: var(--muted-foreground);
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    /* Layout */
+    .flex {
+      display: flex;
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .items-start {
+      align-items: flex-start;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-1 {
+      gap: 0.25rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .gap-3 {
+      gap: 0.75rem;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .gap-6 {
+      gap: 1.5rem;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+
+    .mb-8 {
+      margin-bottom: 2rem;
+    }
+
+    .mb-12 {
+      margin-bottom: 3rem;
+    }
+
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+
+    .ml-2 {
+      margin-left: 0.5rem;
+    }
+
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+
+    .mt-4 {
+      margin-top: 1rem;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .p-4 {
+      padding: 1rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-3 {
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    /* Components */
+    .hidden {
+      display: none !important;
+    }
+
+    .card {
+      background-color: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      border-radius: var(--radius);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-accent:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-destructive {
+      background-color: var(--destructive);
+      color: white;
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground);
+    }
+
+    .btn-outline:hover {
+      background-color: var(--muted);
+    }
+
+    .border-t {
+      border-top: 1px solid var(--border);
+    }
+
+    .border-b {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rounded {
+      border-radius: var(--radius);
+    }
+
+    .bg-white {
+      background-color: white;
+    }
+
+    .bg-gray-100 {
+      background-color: #f3f4f6;
+    }
+
+    .w-full {
+      width: 100%;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .toast {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      padding: 1rem;
+      background-color: white;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      max-width: 350px;
+      animation: slideInRight 0.3s, fadeOut 0.3s 2.7s;
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+
+    .slide-in {
+      animation: slideIn 0.5s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Subscription tiers styling */
+    .tiers-container {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .tier-card {
+      background-color: white;
+      border-radius: var(--radius);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .tier-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .tier-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tier-price {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .tier-price-period {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+    }
+
+    .tier-content {
+      padding: 1.5rem;
+    }
+
+    .tier-features {
+      list-style-type: none;
+      margin-bottom: 1.5rem;
+    }
+
+    .tier-features li {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .tier-features li i {
+      color: var(--success);
+      margin-right: 0.5rem;
+    }
+
+    .tier-action {
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .tier-best-value {
+      background-color: var(--primary);
+      color: white;
+      text-align: center;
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab {
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Dashboard styling */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background-color: white;
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      
+      .grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      
+      .grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      
+      .md\:flex-row {
+        flex-direction: row;
+      }
+      
+      .md\:text-left {
+        text-align: left;
+      }
+      
+      .md\:block {
+        display: block;
+      }
+      
+      .md\:hidden {
+        display: none;
+      }
+
+      .tiers-container {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 767px) {
+      .hidden-mobile {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <!-- Header -->
+  <header class="bg-white border-b py-4 mb-6">
+    <div class="container flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="text-primary text-3xl">
+          <i class="fas fa-link-slash"></i>
+        </div>
+        <div>
+          <h2 class="text-primary mb-0">918 Technologies</h2>
+          <p class="text-xs text-muted">BlockChain BailBonds</p>
+        </div>
+      </div>
+      <div>
+        <nav>
+          <ul class="flex gap-4">
+            <li><a href="index.html" class="text-primary">Home</a></li>
+            <li><a href="bondsman-portal.html" class="text-primary font-medium">Bondsman Portal</a></li>
+            <li><a href="domain-structure.html" class="text-primary">Domain Architecture</a></li>
+            <li><a href="domain-wizard.html" class="text-primary">Connection Wizard</a></li>
+            <li><a href="bail-contract-generator.html" class="text-primary">Contract Generator</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container" style="min-height: calc(100vh - 200px);">
+    <!-- Login/Signup Page (Initial View) -->
+    <div id="auth-page" class="slide-in">
+      <div class="tabs">
+        <div class="tab active" data-tab="login">Login</div>
+        <div class="tab" data-tab="signup">Signup</div>
+      </div>
+
+      <div class="tab-content active" id="login-tab">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div class="card">
+              <h2 class="text-2xl font-bold mb-4">Bondsman Login</h2>
+              <p class="mb-6 text-muted">Access your 918 Technologies account to manage your bail bond opportunities.</p>
+              
+              <form id="login-form">
+                <div class="mb-4">
+                  <label for="login-email" class="block text-sm font-medium mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    id="login-email" 
+                    required 
+                    placeholder="your@email.com"
+                  />
+                </div>
+                
+                <div class="mb-6">
+                  <label for="login-password" class="block text-sm font-medium mb-1">Password</label>
+                  <input 
+                    type="password" 
+                    id="login-password" 
+                    required 
+                    placeholder="Enter your password"
+                  />
+                  <div class="text-right">
+                    <a href="#" class="text-xs text-primary">Forgot password?</a>
+                  </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-full">
+                  Login to Dashboard
+                </button>
+              </form>
+            </div>
+          </div>
+          
+          <div class="hidden-mobile">
+            <div class="h-full flex flex-col justify-center">
+              <h3 class="text-xl font-bold mb-4">Welcome to the Bondsman Portal</h3>
+              <p class="mb-4">Get instant access to bail opportunities and grow your business with our innovative blockchain technology.</p>
+              
+              <div class="bg-gray-100 p-4 rounded">
+                <h4 class="font-medium mb-2">What our subscribers say:</h4>
+                <blockquote class="text-sm text-muted italic mb-4">
+                  "Since joining 918 Technologies, my bail bonds business has increased by over 40%. The automated system sends me qualified leads 24/7, even while I sleep."
+                </blockquote>
+                <div class="flex items-center">
+                  <div class="text-primary mr-2">
+                    <i class="fas fa-user-circle text-2xl"></i>
+                  </div>
+                  <div>
+                    <p class="font-medium text-sm">John Martinez</p>
+                    <p class="text-xs text-muted">Fast Freedom Bail Bonds</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="signup-tab">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold mb-2">Join our Network of Bondsmen</h2>
+          <p class="text-muted">Choose a subscription tier that fits your business needs</p>
+        </div>
+        
+        <!-- Subscription Tiers -->
+        <div class="tiers-container">
+          <!-- Basic Tier -->
+          <div class="tier-card">
+            <div class="tier-header">
+              <h3 class="text-xl font-bold mb-2">Basic</h3>
+              <div class="tier-price">$199<span class="tier-price-period">/month</span></div>
+              <p class="text-sm text-muted">Perfect for individual bondsmen starting out</p>
+            </div>
+            <div class="tier-content">
+              <ul class="tier-features">
+                <li><i class="fas fa-check-circle"></i> Access to bail notification system</li>
+                <li><i class="fas fa-check-circle"></i> 10 mile radius coverage</li>
+                <li><i class="fas fa-check-circle"></i> Up to 15 leads per month</li>
+                <li><i class="fas fa-check-circle"></i> Basic dashboard access</li>
+                <li><i class="fas fa-check-circle"></i> Email notifications</li>
+              </ul>
+            </div>
+            <div class="tier-action">
+              <button class="btn btn-outline w-full signup-tier-btn" data-tier="basic">Select Basic</button>
+            </div>
+          </div>
+          
+          <!-- Pro Tier -->
+          <div class="tier-card">
+            <div class="tier-best-value">Most Popular</div>
+            <div class="tier-header">
+              <h3 class="text-xl font-bold mb-2">Professional</h3>
+              <div class="tier-price">$399<span class="tier-price-period">/month</span></div>
+              <p class="text-sm text-muted">For established bail bonds businesses</p>
+            </div>
+            <div class="tier-content">
+              <ul class="tier-features">
+                <li><i class="fas fa-check-circle"></i> Access to bail notification system</li>
+                <li><i class="fas fa-check-circle"></i> 25 mile radius coverage</li>
+                <li><i class="fas fa-check-circle"></i> Unlimited leads</li>
+                <li><i class="fas fa-check-circle"></i> Advanced dashboard with analytics</li>
+                <li><i class="fas fa-check-circle"></i> Email + SMS notifications</li>
+                <li><i class="fas fa-check-circle"></i> Priority in bondsman selection queue</li>
+                <li><i class="fas fa-check-circle"></i> Automatic contract generation</li>
+              </ul>
+            </div>
+            <div class="tier-action">
+              <button class="btn btn-primary w-full signup-tier-btn" data-tier="pro">Select Professional</button>
+            </div>
+          </div>
+          
+          <!-- Enterprise Tier -->
+          <div class="tier-card">
+            <div class="tier-header">
+              <h3 class="text-xl font-bold mb-2">Enterprise</h3>
+              <div class="tier-price">$899<span class="tier-price-period">/month</span></div>
+              <p class="text-sm text-muted">For multi-agent bail bonds companies</p>
+            </div>
+            <div class="tier-content">
+              <ul class="tier-features">
+                <li><i class="fas fa-check-circle"></i> All Professional features</li>
+                <li><i class="fas fa-check-circle"></i> Statewide coverage</li>
+                <li><i class="fas fa-check-circle"></i> Up to 5 agent accounts</li>
+                <li><i class="fas fa-check-circle"></i> White-label mobile app</li>
+                <li><i class="fas fa-check-circle"></i> First position in bondsman queue</li>
+                <li><i class="fas fa-check-circle"></i> API access for custom integration</li>
+                <li><i class="fas fa-check-circle"></i> Dedicated account manager</li>
+              </ul>
+            </div>
+            <div class="tier-action">
+              <button class="btn btn-outline w-full signup-tier-btn" data-tier="enterprise">Select Enterprise</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Signup Form (hidden initially, shown after tier selection) -->
+        <div id="signup-form-container" class="hidden slide-in">
+          <div class="card">
+            <h3 class="text-xl font-bold mb-4">Complete Your Registration</h3>
+            <p class="mb-4 text-sm" id="selected-tier-message">You've selected the <span id="selected-tier-name" class="font-bold">Professional</span> plan.</p>
+            
+            <form id="signup-form">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="company-name" class="block text-sm font-medium mb-1">Bail Bonds Company Name</label>
+                  <input type="text" id="company-name" required placeholder="Your Bail Bonds Company">
+                </div>
+                
+                <div>
+                  <label for="license-number" class="block text-sm font-medium mb-1">Bail Agent License Number</label>
+                  <input type="text" id="license-number" required placeholder="e.g. BB123456">
+                </div>
+                
+                <div>
+                  <label for="first-name" class="block text-sm font-medium mb-1">First Name</label>
+                  <input type="text" id="first-name" required placeholder="Your first name">
+                </div>
+                
+                <div>
+                  <label for="last-name" class="block text-sm font-medium mb-1">Last Name</label>
+                  <input type="text" id="last-name" required placeholder="Your last name">
+                </div>
+                
+                <div>
+                  <label for="email" class="block text-sm font-medium mb-1">Email Address</label>
+                  <input type="email" id="email" required placeholder="your@email.com">
+                </div>
+                
+                <div>
+                  <label for="phone" class="block text-sm font-medium mb-1">Phone Number</label>
+                  <input type="tel" id="phone" required placeholder="(555) 123-4567">
+                </div>
+                
+                <div>
+                  <label for="password" class="block text-sm font-medium mb-1">Create Password</label>
+                  <input type="password" id="password" required placeholder="Minimum 8 characters">
+                </div>
+                
+                <div>
+                  <label for="confirm-password" class="block text-sm font-medium mb-1">Confirm Password</label>
+                  <input type="password" id="confirm-password" required placeholder="Confirm your password">
+                </div>
+                
+                <div class="md:col-span-2">
+                  <label for="service-area" class="block text-sm font-medium mb-1">Primary Service Area</label>
+                  <select id="service-area" required>
+                    <option value="" disabled selected>Select your primary service area</option>
+                    <option value="los-angeles">Los Angeles County</option>
+                    <option value="orange">Orange County</option>
+                    <option value="san-diego">San Diego County</option>
+                    <option value="san-francisco">San Francisco County</option>
+                    <option value="alameda">Alameda County</option>
+                    <option value="riverside">Riverside County</option>
+                    <option value="sacramento">Sacramento County</option>
+                    <option value="other">Other (specify in comments)</option>
+                  </select>
+                </div>
+                
+                <div class="md:col-span-2">
+                  <label for="additional-info" class="block text-sm font-medium mb-1">Additional Information or Comments</label>
+                  <textarea id="additional-info" rows="3" placeholder="Any additional information you'd like to share"></textarea>
+                </div>
+                
+                <div class="md:col-span-2 flex items-start gap-2 mb-4">
+                  <input type="checkbox" id="terms-agree" required style="width: auto; margin-top: 3px;">
+                  <label for="terms-agree" class="text-sm">
+                    I agree to the <a href="#" class="text-primary">Terms of Service</a> and <a href="#" class="text-primary">Privacy Policy</a>. I understand that my subscription will be automatically renewed unless canceled.
+                  </label>
+                </div>
+              </div>
+              
+              <div class="flex gap-4 justify-end mt-4">
+                <button type="button" id="back-to-tiers" class="btn btn-outline">
+                  Back to Plans
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  Complete Registration
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard (Hidden initially) -->
+    <div id="dashboard-page" class="hidden slide-in">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Bondsman Dashboard</h1>
+        <div>
+          <span class="text-sm text-muted mr-2" id="user-welcome">Welcome, Alex Johnson</span>
+          <button id="logout-btn" class="btn btn-outline">
+            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+          </button>
+        </div>
+      </div>
+      
+      <!-- Stats Overview -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="text-primary mb-2">
+            <i class="fas fa-bell text-xl"></i>
+          </div>
+          <div class="stat-value">24</div>
+          <div class="stat-label">Active Alerts</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="text-success mb-2">
+            <i class="fas fa-check-circle text-xl"></i>
+          </div>
+          <div class="stat-value">18</div>
+          <div class="stat-label">Completed Bonds</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="text-accent mb-2">
+            <i class="fas fa-dollar-sign text-xl"></i>
+          </div>
+          <div class="stat-value">$45k</div>
+          <div class="stat-label">Revenue Generated</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="text-primary mb-2">
+            <i class="fas fa-map-marker-alt text-xl"></i>
+          </div>
+          <div class="stat-value">25mi</div>
+          <div class="stat-label">Coverage Radius</div>
+        </div>
+      </div>
+      
+      <!-- Current Alerts Section -->
+      <div class="card mb-6">
+        <h2 class="text-xl font-bold mb-4">Current Bail Alerts</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b">
+                <th class="text-left py-2 px-4">Detainee Name</th>
+                <th class="text-left py-2 px-4">Location</th>
+                <th class="text-left py-2 px-4">Bail Amount</th>
+                <th class="text-left py-2 px-4">Time</th>
+                <th class="text-left py-2 px-4">Status</th>
+                <th class="text-left py-2 px-4">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b">
+                <td class="py-3 px-4">James Wilson</td>
+                <td class="py-3 px-4">Central County Jail</td>
+                <td class="py-3 px-4">$25,000</td>
+                <td class="py-3 px-4">15 mins ago</td>
+                <td class="py-3 px-4"><span class="px-2 py-1 text-xs bg-destructive/10 text-destructive rounded-full">Urgent</span></td>
+                <td class="py-3 px-4">
+                  <button class="btn btn-primary py-1 px-3 text-xs">Accept</button>
+                </td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-3 px-4">Maria Rodriguez</td>
+                <td class="py-3 px-4">Eastern District Facility</td>
+                <td class="py-3 px-4">$15,000</td>
+                <td class="py-3 px-4">43 mins ago</td>
+                <td class="py-3 px-4"><span class="px-2 py-1 text-xs bg-destructive/10 text-destructive rounded-full">Urgent</span></td>
+                <td class="py-3 px-4">
+                  <button class="btn btn-primary py-1 px-3 text-xs">Accept</button>
+                </td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-3 px-4">Robert Chen</td>
+                <td class="py-3 px-4">Southern District Jail</td>
+                <td class="py-3 px-4">$30,000</td>
+                <td class="py-3 px-4">1.5 hours ago</td>
+                <td class="py-3 px-4"><span class="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">New</span></td>
+                <td class="py-3 px-4">
+                  <button class="btn btn-primary py-1 px-3 text-xs">Accept</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4">Sarah Johnson</td>
+                <td class="py-3 px-4">Downtown Detention Center</td>
+                <td class="py-3 px-4">$10,000</td>
+                <td class="py-3 px-4">3 hours ago</td>
+                <td class="py-3 px-4"><span class="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">New</span></td>
+                <td class="py-3 px-4">
+                  <button class="btn btn-primary py-1 px-3 text-xs">Accept</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Recent Activity -->
+      <div class="card mb-6">
+        <h2 class="text-xl font-bold mb-4">Recent Activity</h2>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3 p-3 border-b">
+            <div class="text-success flex-shrink-0">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div>
+              <p class="font-medium">Bond Completed: David Martinez</p>
+              <p class="text-sm text-muted">Successfully processed bail bond for $20,000</p>
+              <p class="text-xs text-muted">2 hours ago</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 border-b">
+            <div class="text-primary flex-shrink-0">
+              <i class="fas fa-bell"></i>
+            </div>
+            <div>
+              <p class="font-medium">New Alert: Thomas Wright</p>
+              <p class="text-sm text-muted">New bail request at Western County Jail</p>
+              <p class="text-xs text-muted">Yesterday at 9:45 PM</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 border-b">
+            <div class="text-accent flex-shrink-0">
+              <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div>
+              <p class="font-medium">Payment Received: $2,500</p>
+              <p class="text-sm text-muted">Commission for Johnson bail bond</p>
+              <p class="text-xs text-muted">Yesterday at 4:30 PM</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3">
+            <div class="text-primary flex-shrink-0">
+              <i class="fas fa-file-contract"></i>
+            </div>
+            <div>
+              <p class="font-medium">Contract Deployed</p>
+              <p class="text-sm text-muted">Bail bond contract for Lisa Thompson successfully deployed to blockchain</p>
+              <p class="text-xs text-muted">2 days ago</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Information -->
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Account Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-sm font-medium mb-1">Subscription Plan</p>
+            <p>Professional Plan - $399/month</p>
+          </div>
+          <div>
+            <p class="text-sm font-medium mb-1">Next Billing Date</p>
+            <p>June 15, 2024</p>
+          </div>
+          <div>
+            <p class="text-sm font-medium mb-1">Coverage Area</p>
+            <p>25 mile radius from Los Angeles County</p>
+          </div>
+          <div>
+            <p class="text-sm font-medium mb-1">Remaining Alerts</p>
+            <p>Unlimited</p>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button class="btn btn-outline btn-sm">
+            <i class="fas fa-cog mr-2"></i>Account Settings
+          </button>
+          <button class="btn btn-accent btn-sm">
+            <i class="fas fa-arrow-up mr-2"></i>Upgrade Plan
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 mt-8 border-t text-sm text-muted bg-white">
+    <div class="container">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          &copy; <span id="current-year"></span> 918 Technologies Inc. All rights reserved.
+        </div>
+        <div class="flex gap-4">
+          <a href="#" class="text-primary">Terms</a>
+          <a href="#" class="text-primary">Privacy</a>
+          <a href="#" class="text-primary">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Domain Connector Script -->
+  <script src="./domain-connector.js"></script>
+  
+  <!-- Bondsman Actions Script -->
+  <script src="./bondsman-actions.js"></script>
+  
+  <!-- JavaScript -->
+  <script>
+    // Set current year in footer
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // DOM Elements
+    const authPage = document.getElementById('auth-page');
+    const dashboardPage = document.getElementById('dashboard-page');
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    const signupFormContainer = document.getElementById('signup-form-container');
+    const backToTiersBtn = document.getElementById('back-to-tiers');
+    const logoutBtn = document.getElementById('logout-btn');
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const tierButtons = document.querySelectorAll('.signup-tier-btn');
+    const selectedTierName = document.getElementById('selected-tier-name');
+
+    // Export showToast for bondsman-actions.js to use
+    window.showToast = function(title, message, variant = "default") {
+      const toastContainer = document.getElementById('toast-container');
+      
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      if (variant === "destructive") {
+        toast.style.borderLeft = "4px solid var(--destructive)";
+      } else if (variant === "success") {
+        toast.style.borderLeft = "4px solid var(--success)";
+      } else {
+        toast.style.borderLeft = "4px solid var(--primary)";
+      }
+      
+      toast.innerHTML = `
+        <div class="font-semibold">${title}</div>
+        <div class="text-sm text-muted">${message}</div>
+      `;
+      
+      toastContainer.appendChild(toast);
+      
+      // Remove toast after 3 seconds
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    };
+
+    // Tab switching
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active class from all tabs
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to clicked tab
+        tab.classList.add('active');
+        
+        // Show corresponding content
+        const tabId = tab.dataset.tab;
+        document.getElementById(`${tabId}-tab`).classList.add('active');
+        
+        // Reset signup form if switching tabs
+        signupFormContainer.classList.add('hidden');
+      });
+    });
+
+    // Tier selection
+    tierButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const tier = button.dataset.tier;
+        let tierDisplayName = "Basic";
+        
+        if (tier === "pro") {
+          tierDisplayName = "Professional";
+        } else if (tier === "enterprise") {
+          tierDisplayName = "Enterprise";
+        }
+        
+        selectedTierName.textContent = tierDisplayName;
+        signupFormContainer.classList.remove('hidden');
+        
+        // Scroll to form
+        signupFormContainer.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Back to tiers
+    backToTiersBtn.addEventListener('click', () => {
+      signupFormContainer.classList.add('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // Login form submission
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      
+      if (email && password) {
+        // Check for admin login
+        if (email.toLowerCase() === 'founder918tech@gmail.com') {
+          // Special admin login
+          showToast("Admin Login Successful", "Welcome to the admin dashboard!", "success");
+          
+          // Show dashboard with admin privileges after a brief delay
+          setTimeout(() => {
+            authPage.classList.add('hidden');
+            dashboardPage.classList.remove('hidden');
+            
+            // Set admin welcome message
+            document.getElementById('user-welcome').textContent = `Welcome, Administrator`;
+            
+            // Show admin-specific elements
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+            
+            // Hide non-admin elements
+            document.querySelectorAll('.non-admin-only').forEach(el => el.classList.add('hidden'));
+            
+            // Add admin badge to header
+            const userWelcome = document.getElementById('user-welcome');
+            if (!userWelcome.querySelector('.admin-badge')) {
+              const adminBadge = document.createElement('span');
+              adminBadge.className = 'admin-badge ml-2 text-xs bg-destructive-color text-white px-2 py-1 rounded';
+              adminBadge.textContent = 'ADMIN';
+              userWelcome.appendChild(adminBadge);
+            }
+            
+            // Initialize bondsman dashboard with admin privileges
+            if (typeof BondsmanActions !== 'undefined' && BondsmanActions.initializeBondsmanDashboard) {
+              BondsmanActions.initializeBondsmanDashboard(true); // Pass true for admin
+            }
+          }, 1000);
+        } else {
+          // Regular user login
+          showToast("Login Successful", "Welcome back to your dashboard!", "success");
+          
+          // Show dashboard after a brief delay
+          setTimeout(() => {
+            authPage.classList.add('hidden');
+            dashboardPage.classList.remove('hidden');
+            
+            // Set user welcome message
+            document.getElementById('user-welcome').textContent = `Welcome, ${email.split('@')[0]}`;
+            
+            // Hide admin-specific elements
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+            
+            // Show non-admin elements
+            document.querySelectorAll('.non-admin-only').forEach(el => el.classList.remove('hidden'));
+            
+            // Initialize bondsman dashboard
+            if (typeof BondsmanActions !== 'undefined' && BondsmanActions.initializeBondsmanDashboard) {
+              BondsmanActions.initializeBondsmanDashboard(false); // Pass false for non-admin
+            }
+          }, 1000);
+        }
+      }
+    });
+
+    // Signup form submission
+    signupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const firstName = document.getElementById('first-name').value;
+      const lastName = document.getElementById('last-name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      const companyName = document.getElementById('company-name').value;
+      const licenseNumber = document.getElementById('license-number').value;
+      
+      if (password !== confirmPassword) {
+        showToast("Password Error", "Passwords do not match. Please try again.", "destructive");
+        return;
+      }
+      
+      // In a real app, this would send data to the server
+      showToast("Registration Successful", "Your account has been created. You'll be redirected to your dashboard.", "success");
+      
+      // Show dashboard after a brief delay
+      setTimeout(() => {
+        authPage.classList.add('hidden');
+        dashboardPage.classList.remove('hidden');
+        
+        // Set user welcome message
+        document.getElementById('user-welcome').textContent = `Welcome, ${firstName} ${lastName}`;
+        
+        // Save account info
+        if (typeof BondsmanActions !== 'undefined') {
+          // Update bondsman account info
+          window.bondsmanAccount = {
+            id: 'bnd_' + Math.random().toString(36).substring(2, 10),
+            name: `${firstName} ${lastName}`,
+            company: companyName,
+            license: licenseNumber,
+            email: email,
+            subscription: {
+              tier: selectedTierName.textContent,
+              status: 'active'
+            }
+          };
+          
+          // Initialize bondsman dashboard
+          if (BondsmanActions.initializeBondsmanDashboard) {
+            BondsmanActions.initializeBondsmanDashboard();
+          }
+        }
+      }, 1500);
+    });
+
+    // Logout button
+    logoutBtn.addEventListener('click', () => {
+      dashboardPage.classList.add('hidden');
+      authPage.classList.remove('hidden');
+      
+      // Reset forms
+      loginForm.reset();
+      signupForm.reset();
+      
+      showToast("Logged Out", "You have been successfully logged out.", "success");
+    });
+
+    // Check for dummy login (for demo purposes)
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add admin login button for easy access
+      const loginForm = document.getElementById('login-form');
+      const loginHeader = loginForm.querySelector('h2');
+      
+      const adminLoginBtn = document.createElement('button');
+      adminLoginBtn.type = 'button';
+      adminLoginBtn.className = 'text-xs bg-destructive/10 text-destructive px-2 py-1 rounded absolute right-0 top-0';
+      adminLoginBtn.textContent = 'Admin Login';
+      adminLoginBtn.addEventListener('click', () => {
+        document.getElementById('login-email').value = 'founder918tech@gmail.com';
+        document.getElementById('login-password').value = 'admin123';
+        showToast('Admin Credentials', 'Admin login credentials filled automatically', 'default');
+      });
+      
+      loginHeader.style.position = 'relative';
+      loginHeader.appendChild(adminLoginBtn);
+      
+      // Auto-fill demo credentials (for easy testing)
+      document.getElementById('login-email').value = 'demo@918tech.com';
+      document.getElementById('login-password').value = 'demo123';
+      
+      // Apply multilingual support if available
+      if (typeof ContractTranslations !== 'undefined') {
+        showToast('Multilingual Support', 'Contract generation now supports multiple languages!', 'success');
+      }
+    });
+  </script>
+  
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+    
+    // Check if the app was installed as PWA
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        // App is running in standalone mode (installed as PWA)
+        document.body.classList.add('installed-pwa');
+        
+        // Add PWA indicator to header
+        const header = document.querySelector('header');
+        if (header) {
+          const pwaBadge = document.createElement('div');
+          pwaBadge.className = 'pwa-badge';
+          pwaBadge.innerHTML = '<i class="fas fa-mobile-alt"></i> Installed App';
+          pwaBadge.style.position = 'absolute';
+          pwaBadge.style.top = '0.5rem';
+          pwaBadge.style.right = '0.5rem';
+          pwaBadge.style.fontSize = '0.75rem';
+          pwaBadge.style.backgroundColor = 'rgba(22, 163, 74, 0.1)';
+          pwaBadge.style.color = 'var(--success)';
+          pwaBadge.style.padding = '0.25rem 0.5rem';
+          pwaBadge.style.borderRadius = '9999px';
+          header.style.position = 'relative';
+          header.appendChild(pwaBadge);
+        }
+      }
+    });
+  </script>
+  
+  <!-- IPFS Integration Script -->
+  <script src="./ipfs-storage.js"></script>
+</body>
+</html>
