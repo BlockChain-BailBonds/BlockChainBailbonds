@@ -20,17 +20,19 @@
   </header>
 
   <main class="container py-8" style="max-width: 900px;">
-    <section class="card mb-8">
+    <section class="card mb-8 text-center" style="padding: 3rem 1.5rem;">
       <p class="text-xs text-muted">CONSENT-BASED INTAKE</p>
-      <h1 class="text-primary">Request licensed bondsman review</h1>
-      <p class="text-muted">Submit your information once. The system records your consent, creates a reference number, and routes the request for human review. It does not make a bail decision, identify anyone automatically, or deploy a contract without licensed human action.</p>
-      <div class="flex gap-3 flex-wrap mt-4">
-        <button id="emergency-button" class="btn btn-emergency" type="button">Start intake</button>
-        <a class="btn btn-outline" href="./bondsman-portal.html">Operator sign in</a>
-      </div>
+      <h1 class="text-primary">BlockChain BailBonds</h1>
+      <p class="text-lg text-muted" style="max-width: 42rem; margin: 0 auto 2rem;">When you anticipate detention, start a secure intake for licensed bondsman review.</p>
+      <button id="emergency-button" class="btn-emergency" type="button" aria-controls="intake-panel" aria-expanded="false">
+        <span class="flex flex-col items-center"><i class="fas fa-exclamation-triangle text-4xl mb-3"></i><span class="text-lg">I'M GOING TO</span><span class="text-3xl font-bold">JAIL!</span></span>
+      </button>
+      <p class="text-xs text-muted mt-4">Press only for a genuine situation. This starts intake; it does not guarantee release or make a bail decision.</p>
+      <div class="mt-6"><a class="text-primary" href="./bondsman-portal.html">Licensed operator portal</a></div>
     </section>
 
-    <section id="intake-panel" class="card mb-8">
+    <section id="intake-panel" class="card mb-8" hidden>
+      <div class="text-center mb-6"><h2>Secure intake</h2><p class="text-muted">Provide the minimum information needed for human review.</p></div>
       <h2>Case intake</h2>
       <p class="text-sm text-muted">Fields marked required are needed to submit a review request. Location and wallet access are optional and require separate browser permission.</p>
       <form id="emergency-form" class="grid gap-4 mt-4">
@@ -86,7 +88,12 @@
   <script src="./js/public-share.js"></script>
   <script>
     document.getElementById('current-year').textContent = new Date().getFullYear();
-    document.getElementById('emergency-button').addEventListener('click', () => document.getElementById('intake-panel').scrollIntoView({ behavior: 'smooth' }));
+    document.getElementById('emergency-button').addEventListener('click', () => {
+      const panel = document.getElementById('intake-panel');
+      panel.hidden = false;
+      document.getElementById('emergency-button').setAttribute('aria-expanded', 'true');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   </script>
 </body>
 </html>
