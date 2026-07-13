@@ -32,9 +32,17 @@
         const mugshot = confirmed && source.mugshot_url ? `<img src="${esc(source.mugshot_url)}" alt="Confirmed source mugshot" style="max-width:120px">` : "Mugshot not provided or not human-confirmed";
         const intake = detail.intake || {};
         const report = (source.matches || []).map((match) => match.record || match);
-        return `<div class="p-3 border rounded mb-2"><strong>${esc(item.id)}</strong> — ${esc(item.status)} — ${esc(item.urgency)}<br><span>${esc(detail.packet?.explanation || "Human review required")}</span><br><span class="text-sm">${mugshot}</span><details class="mt-2"><summary>Intake and booking report</summary><h4>Client intake</h4><pre>${esc(JSON.stringify(intake, null, 2))}</pre><h4>Source report</h4><pre>${esc(JSON.stringify(report, null, 2))}</pre><p class="text-sm">Source match and identity still require bondsman confirmation.</p></details></div>`;
+        const oscn = source.oscn || { status: "not_configured", records: [] };
+        const share = confirmed ? `<button data-share="${esc(item.id)}" class="btn btn-primary mt-2">Create 24-hour family link</button>` : "";
+        return `<div class="p-3 border rounded mb-2"><strong>${esc(item.id)}</strong> — ${esc(item.status)} — ${esc(item.urgency)}<br><span>${esc(detail.packet?.explanation || "Human review required")}</span><br><span class="text-sm">${mugshot}</span>${share}<details class="mt-2"><summary>Intake, booking, and OSCN report</summary><h4>Client intake</h4><pre>${esc(JSON.stringify(intake, null, 2))}</pre><h4>Booking source report</h4><pre>${esc(JSON.stringify(report, null, 2))}</pre><h4>OSCN source report (${esc(oscn.status)})</h4><pre>${esc(JSON.stringify(oscn.records || [], null, 2))}</pre><p class="text-sm">All source matches require bondsman confirmation.</p></details></div>`;
       }));
       root.innerHTML = plans() + card("Live intake consolidation", rows.join("") || "<p>No requests yet.</p>");
+      root.querySelectorAll("[data-share]").forEach((button) => button.addEventListener("click", async () => {
+        const response = await fetch(api + "/requests/" + encodeURIComponent(button.dataset.share) + "/share", { method: "POST", headers });
+        const result = await response.json();
+        if (!response.ok) return alert(result.error || "Unable to create share link");
+        prompt("Copy this 24-hour family link", result.share_url);
+      }));
     } catch (error) {
       root.innerHTML = plans() + card("Dashboard unavailable", `<p>${esc(error.message)}</p>`);
     }

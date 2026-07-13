@@ -45,6 +45,10 @@ def db() -> sqlite3.Connection:
       channel TEXT NOT NULL, recipient TEXT NOT NULL, message TEXT NOT NULL,
       status TEXT NOT NULL, created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS public_shares (
+      token TEXT PRIMARY KEY, request_id TEXT NOT NULL, created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+    );
     """)
     return conn
 
@@ -67,6 +71,16 @@ def source_get(url: str, params: dict) -> dict:
     )
     with urllib.request.urlopen(req, timeout=15) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def oscn_lookup(intake: dict) -> dict:
+    if not OSCN_SERVICE:
+        return {"status": "not_configured", "records": []}
+    payload = json.dumps({"county": intake.get("county", "Tulsa"), "full_name": intake.get("full_name", ""), "date_of_birth": intake.get("date_of_birth", "")}).encode()
+    req = urllib.request.Request(OSCN_SERVICE.rstrip("/") + "/search", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=20) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    return {"status": data.get("status", "ok"), "records": data.get("records", data.get("cases", [])), "checked_at": now()}
 
 
 def normalize_match(payload: dict, intake: dict) -> dict:
@@ -166,6 +180,7 @@ class Handler(BaseHTTPRequestHandler):
                 intake = json.loads(row["intake_json"])
                 payload = source_get(INMATE_API, {"name": intake.get("full_name", "")})
                 source = normalize_match(payload, intake)
+                source["oscn"] = oscn_lookup(intake)
                 packet = review_packet(intake, source)
                 conn.execute("UPDATE requests SET status=?,source_json=?,packet_json=? WHERE id=?",
                     ("source_found" if source["matches"] else "awaiting_match", json.dumps(source), json.dumps(packet), request_id))
@@ -192,6 +207,21 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute("UPDATE requests SET fee_json=? WHERE id=?", (json.dumps(data), request_id))
                 audit(conn, request_id, "bondsman", "fee_offer_recorded", {"schedule_name": data["schedule_name"]})
                 return self.send_json(200, {"request_id": request_id, "fee_offer": data})
+            if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "share":
+                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                request_id = parts[2]
+                row = conn.execute("SELECT review_json,source_json FROM requests WHERE id=?", (request_id,)).fetchone()
+                if not row: return self.send_json(404, {"error": "request not found"})
+                review = json.loads(row["review_json"] or "{}")
+                if review.get("decision") not in {"approve", "approve_with_conditions"}:
+                    return self.send_json(409, {"error": "booking must be human-confirmed before sharing"})
+                token = secrets.token_urlsafe(24)
+                from datetime import timedelta
+                expires = datetime.now(timezone.utc) + timedelta(hours=24)
+                conn.execute("INSERT INTO public_shares VALUES(?,?,?,?,0)", (token, request_id, now(), expires.isoformat()))
+                conn.commit()
+                base = os.environ.get("PUBLIC_APP_URL", "")
+                return self.send_json(201, {"share_token": token, "share_url": base + "?share=" + token if base else "?share=" + token, "expires_at": expires.isoformat()})
             return self.send_json(404, {"error": "route not found"})
         finally:
             conn.close()
@@ -199,6 +229,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health": return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow"})
         public_parts = [p for p in self.path.split("/") if p]
+        if len(public_parts) == 4 and public_parts[:3] == ["api", "public", "shares"]:
+            conn = db()
+            row = conn.execute("SELECT r.*,s.expires_at,s.revoked FROM requests r JOIN public_shares s ON s.request_id=r.id WHERE s.token=?", (public_parts[3],)).fetchone()
+            if not row or row["revoked"] or row["expires_at"] < now(): return self.send_json(404, {"error": "share link expired or revoked"})
+            intake = json.loads(row["intake_json"]); source = json.loads(row["source_json"] or "{}")
+            safe = {"request_id": row["id"], "status": row["status"], "urgency": row["urgency"], "expires_at": row["expires_at"],
+                    "client_name": intake.get("full_name"), "county": intake.get("county"), "booking_report": source.get("matches", []),
+                    "oscn_report": source.get("oscn", {}), "mugshot_url": source.get("mugshot_url"), "source_checked_at": source.get("checked_at")}
+            return self.send_json(200, safe)
         if len(public_parts) == 4 and public_parts[:3] == ["api", "public", "requests"]:
             conn = db()
             row = conn.execute("SELECT id,status,urgency,created_at FROM requests WHERE id=?", (public_parts[3],)).fetchone()
