@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: blockchain-bailbonds-api
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python3 backend/server.py
+    healthCheckPath: /health
+    envVars:
+      - key: BAILBONDS_ADMIN_TOKEN
+        sync: false
+      - key: BAILBONDS_ALLOWED_ORIGIN
+        value: https://blockchain-bailbonds.github.io
+      - key: PUBLIC_APP_URL
+        value: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
+      - key: BAILBONDS_DB
+        value: /tmp/bailbonds/data.sqlite3
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_STARTER
+        sync: false
+      - key: STRIPE_PRICE_PROFESSIONAL
+        sync: false
+      - key: STRIPE_PRICE_AGENCY
+        sync: false
+      - key: TULSA_INMATE_API_URL
+        sync: false
+      - key: OSCN_SERVICE_URL
+        sync: false
+      - key: BAILBONDS_USER_AGENT
+        value: 918-BailBonds/1.0
