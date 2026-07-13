@@ -644,6 +644,18 @@
           </div>
         </button>
       </div>
+
+      <section id="device-diagnostics" class="card mb-12" aria-labelledby="diagnostics-title">
+        <h2 id="diagnostics-title">Optional device diagnostics</h2>
+        <p class="text-muted">Share a connection estimate or choose a nearby Bluetooth device only when you explicitly approve it. We do not mine, scan, or read device contents.</p>
+        <label class="flex items-center gap-2 mt-4"><input id="diagnostics-consent" type="checkbox"> I consent to collect this limited diagnostic information.</label>
+        <div class="flex gap-4 mt-4 flex-wrap">
+          <button id="measure-bandwidth-btn" class="btn btn-primary" disabled>Measure connection</button>
+          <button id="choose-nearby-device-btn" class="btn btn-outline" disabled>Choose nearby device</button>
+          <button id="clear-diagnostics-btn" class="btn btn-outline">Clear saved diagnostics</button>
+        </div>
+        <pre id="diagnostics-output" class="mt-4 text-sm" aria-live="polite">No diagnostics collected.</pre>
+      </section>
       
       <!-- Permissions and User Info Section -->
       <div id="permissions-section" class="hidden slide-in mb-12 card" style="border: 4px solid var(--destructive);">
@@ -1506,6 +1518,7 @@
     <script src="./config.js"></script><script src="./runtime-config.js"></script>
     <script src="./js/public-share.js"></script>
     <script src="./js/tulsa-workflow.js"></script>
+    <script src="./js/diagnostics.js"></script>
   
   <!-- Domain Integration Script -->
   <script>
