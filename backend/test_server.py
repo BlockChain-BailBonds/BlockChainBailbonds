@@ -7,7 +7,7 @@ from pathlib import Path
 os.environ["BAILBONDS_ADMIN_TOKEN"] = "test-admin-token"
 with tempfile.TemporaryDirectory() as temp:
     os.environ["BAILBONDS_DB"] = str(Path(temp) / "test.sqlite3")
-    from server import db, normalize_match, review_packet
+    from backend.server import db, normalize_match, review_packet
 
 
 class WorkflowTests(unittest.TestCase):

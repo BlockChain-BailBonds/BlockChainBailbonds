@@ -196,6 +196,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health": return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow"})
+        public_parts = [p for p in self.path.split("/") if p]
+        if len(public_parts) == 4 and public_parts[:3] == ["api", "public", "requests"]:
+            conn = db()
+            row = conn.execute("SELECT id,status,urgency,created_at FROM requests WHERE id=?", (public_parts[3],)).fetchone()
+            if not row: return self.send_json(404, {"error": "request not found"})
+            return self.send_json(200, dict(row))
         if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
         parts = [p for p in self.path.split("/") if p]
         conn = db()

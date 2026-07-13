@@ -1,5 +1,5 @@
 import unittest
-from agent import deployment_plan, evaluate
+from compliance.agent import deployment_plan, evaluate
 
 
 class ComplianceTests(unittest.TestCase):
