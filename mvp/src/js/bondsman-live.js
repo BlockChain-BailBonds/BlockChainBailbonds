@@ -15,8 +15,16 @@
   function bindPlans(root) {
     root.querySelectorAll("[data-plan]").forEach((button) => button.addEventListener("click", async () => {
       if (!api || !token) return alert("Configure the licensed bondsman API and sign in before starting a subscription.");
-      const result = await fetch(api + "/billing/checkout", { method: "POST", headers: { ...{"Authorization": "Bearer " + token}, "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: button.dataset.plan, email: window.BAILBONDS_BILLING_EMAIL || "", success_url: location.href + "?billing=success", cancel_url: location.href + "?billing=cancel" }) }).then((r) => r.json());
-      if (result.url) location.href = result.url; else alert(result.error || "Billing is not configured yet.");
+      if (!window.ethereum) return alert("Connect a compatible EVM wallet to pay with crypto.");
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const result = await fetch(api + "/billing/checkout", { method: "POST", headers: { ...{"Authorization": "Bearer " + token}, "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: button.dataset.plan, wallet_address: accounts[0], success_url: location.href + "?billing=success", cancel_url: location.href + "?billing=cancel" }) }).then((r) => r.json());
+        if (result.status === "not_configured") return alert("Crypto billing is not configured yet.");
+        if (!result.recipient || !result.amount_wei) return alert(result.error || "No payment details were returned.");
+        const txHash = await window.ethereum.request({ method: "eth_sendTransaction", params: [{ from: accounts[0], to: result.recipient, value: "0x" + BigInt(result.amount_wei).toString(16) }] });
+        const verified = await fetch(api + "/billing/crypto/verify", { method: "POST", headers: { ...{"Authorization": "Bearer " + token}, "Content-Type": "application/json" }, body: JSON.stringify({ tx_hash: txHash, amount_wei: result.amount_wei }) }).then((r) => r.json());
+        alert(verified.status === "confirmed" ? "Payment confirmed." : "Payment submitted; confirmation is still pending.");
+      } catch (error) { alert(error.message || "Wallet payment cancelled or failed."); }
     }));
   }
   async function load() {

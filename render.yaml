@@ -15,15 +15,19 @@ services:
         value: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
       - key: BAILBONDS_DB
         value: /tmp/bailbonds/data.sqlite3
-      - key: STRIPE_SECRET_KEY
+      - key: CRYPTO_PAYMENT_ADDRESS
         sync: false
-      - key: STRIPE_WEBHOOK_SECRET
+      - key: CRYPTO_RPC_URL
         sync: false
-      - key: STRIPE_PRICE_STARTER
+      - key: CRYPTO_CHAIN_ID
+        value: 0x1
+      - key: CRYPTO_ASSET
+        value: native
+      - key: CRYPTO_PRICE_STARTER_WEI
         sync: false
-      - key: STRIPE_PRICE_PROFESSIONAL
+      - key: CRYPTO_PRICE_PROFESSIONAL_WEI
         sync: false
-      - key: STRIPE_PRICE_AGENCY
+      - key: CRYPTO_PRICE_AGENCY_WEI
         sync: false
       - key: TULSA_INMATE_API_URL
         sync: false
