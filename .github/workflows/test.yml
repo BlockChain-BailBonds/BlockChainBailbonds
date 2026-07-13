@@ -12,5 +12,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python3 -m unittest backend/test_server.py compliance/test_agent.py
+      - run: python3 -m unittest backend/test_server.py backend/test_billing.py compliance/test_agent.py
       - run: bash build_static.sh

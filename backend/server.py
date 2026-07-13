@@ -12,6 +12,10 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+try:
+    from .billing import create_checkout, plan_catalog, verify_webhook
+except ImportError:
+    from billing import create_checkout, plan_catalog, verify_webhook
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -48,6 +52,11 @@ def db() -> sqlite3.Connection:
     CREATE TABLE IF NOT EXISTS public_shares (
       token TEXT PRIMARY KEY, request_id TEXT NOT NULL, created_at TEXT NOT NULL,
       expires_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY, bondsman_id TEXT NOT NULL, plan_id TEXT NOT NULL,
+      status TEXT NOT NULL, provider_customer_id TEXT, provider_subscription_id TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     """)
     return conn
@@ -172,6 +181,24 @@ class Handler(BaseHTTPRequestHandler):
                     (request_id, now(), "new", urgency, json.dumps(data), None, None, None, None))
                 audit(conn, request_id, "client", "intake_submitted", {"urgency": urgency})
                 return self.send_json(201, {"request_id": request_id, "status": "new"})
+            if parts == ["api", "billing", "webhook"]:
+                secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+                if not secret: return self.send_json(503, {"error": "billing webhook not configured"})
+                try:
+                    size = int(self.headers.get("Content-Length", "0")); payload = self.rfile.read(size)
+                    event = verify_webhook(payload, self.headers.get("Stripe-Signature", ""), secret)
+                except (ValueError, KeyError) as error:
+                    return self.send_json(400, {"error": str(error)})
+                detail = event.get("data", {}).get("object", {})
+                if event.get("type", "").startswith("customer.subscription"):
+                    conn.execute("INSERT OR REPLACE INTO subscriptions VALUES(?,?,?,?,?,?,?,?)", (detail.get("id", secrets.token_urlsafe(8)), detail.get("metadata", {}).get("bondsman_id", "unknown"), detail.get("metadata", {}).get("plan_id", "unknown"), detail.get("status", "unknown"), detail.get("customer"), detail.get("id"), now(), now())); conn.commit()
+                return self.send_json(200, {"received": True})
+            if parts == ["api", "billing", "checkout"]:
+                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                data = self.body()
+                try: result = create_checkout(data.get("plan_id", ""), data.get("email", ""), data.get("success_url", ""), data.get("cancel_url", ""))
+                except ValueError as error: return self.send_json(400, {"error": str(error)})
+                return self.send_json(200, result)
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "poll":
                 if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 request_id = parts[2]
@@ -228,6 +255,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health": return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow"})
+        if self.path == "/api/billing/plans": return self.send_json(200, {"plans": plan_catalog()})
         public_parts = [p for p in self.path.split("/") if p]
         if len(public_parts) == 4 and public_parts[:3] == ["api", "public", "shares"]:
             conn = db()

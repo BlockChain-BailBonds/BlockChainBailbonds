@@ -7,15 +7,23 @@
   function card(title, body) { return `<article class="card"><h3>${esc(title)}</h3>${body}</article>`; }
   function plans() {
     return card("Bondsman subscription", `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="p-4 border rounded"><strong>Starter</strong><p>Profile, basic intake, manual notes.</p></div>
-      <div class="p-4 border rounded"><strong>Professional</strong><p>Emergency routing, source packets, documents, reminders.</p></div>
-      <div class="p-4 border rounded"><strong>Agency</strong><p>Staff accounts, county routing, analytics, exports.</p></div>
+      <div class="p-4 border rounded"><strong>Starter</strong><p>Profile, basic intake, manual notes.</p><button data-plan="starter" class="btn btn-primary">Start plan</button></div>
+      <div class="p-4 border rounded"><strong>Professional</strong><p>Emergency routing, source packets, documents, reminders.</p><button data-plan="professional" class="btn btn-primary">Start plan</button></div>
+      <div class="p-4 border rounded"><strong>Agency</strong><p>Staff accounts, county routing, analytics, exports.</p><button data-plan="agency" class="btn btn-primary">Start plan</button></div>
     </div><p class="text-sm text-muted">Pricing and billing are configured by the operator; this page does not collect payment credentials.</p>`);
+  }
+  function bindPlans(root) {
+    root.querySelectorAll("[data-plan]").forEach((button) => button.addEventListener("click", async () => {
+      if (!api || !token) return alert("Configure the licensed bondsman API and sign in before starting a subscription.");
+      const result = await fetch(api + "/billing/checkout", { method: "POST", headers: { ...{"Authorization": "Bearer " + token}, "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: button.dataset.plan, email: window.BAILBONDS_BILLING_EMAIL || "", success_url: location.href + "?billing=success", cancel_url: location.href + "?billing=cancel" }) }).then((r) => r.json());
+      if (result.url) location.href = result.url; else alert(result.error || "Billing is not configured yet.");
+    }));
   }
   async function load() {
     const root = document.getElementById("live-bondsman-dashboard");
     if (!root) return;
     root.innerHTML = plans() + card("Live intake consolidation", "<p>Loading...</p>");
+    bindPlans(root);
     if (!api || !token) {
       root.innerHTML += card("Connection required", "<p>Configure the licensed bondsman API endpoint and session token to load live requests.</p>");
       return;
@@ -37,6 +45,7 @@
         return `<div class="p-3 border rounded mb-2"><strong>${esc(item.id)}</strong> — ${esc(item.status)} — ${esc(item.urgency)}<br><span>${esc(detail.packet?.explanation || "Human review required")}</span><br><span class="text-sm">${mugshot}</span>${share}<details class="mt-2"><summary>Intake, booking, and OSCN report</summary><h4>Client intake</h4><pre>${esc(JSON.stringify(intake, null, 2))}</pre><h4>Booking source report</h4><pre>${esc(JSON.stringify(report, null, 2))}</pre><h4>OSCN source report (${esc(oscn.status)})</h4><pre>${esc(JSON.stringify(oscn.records || [], null, 2))}</pre><p class="text-sm">All source matches require bondsman confirmation.</p></details></div>`;
       }));
       root.innerHTML = plans() + card("Live intake consolidation", rows.join("") || "<p>No requests yet.</p>");
+      bindPlans(root);
       root.querySelectorAll("[data-share]").forEach((button) => button.addEventListener("click", async () => {
         const response = await fetch(api + "/requests/" + encodeURIComponent(button.dataset.share) + "/share", { method: "POST", headers });
         const result = await response.json();
