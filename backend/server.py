@@ -15,9 +15,11 @@ from pathlib import Path
 try:
     from .billing import create_checkout, plan_catalog, verify_transaction
     from .auth import admin_configured, new_session, verify_password
+    from .prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
+    from prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -71,6 +73,17 @@ def db() -> sqlite3.Connection:
     CREATE TABLE IF NOT EXISTS payment_events (
       tx_hash TEXT PRIMARY KEY, wallet_address TEXT, plan_id TEXT, amount_wei TEXT,
       status TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bbt_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL,
+      entry_type TEXT NOT NULL, amount_bbt INTEGER NOT NULL,
+      source_ref TEXT NOT NULL, detail_json TEXT NOT NULL, created_at TEXT NOT NULL,
+      UNIQUE(entry_type, source_ref)
+    );
+    CREATE TABLE IF NOT EXISTS adtv_revenue_events (
+      event_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, usd_cents INTEGER NOT NULL,
+      bbt_amount INTEGER NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
     );
     """)
     return conn
@@ -203,8 +216,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def body(self):
+        return json.loads(self.body_raw() or b"{}")
+
+    def body_raw(self):
         size = int(self.headers.get("Content-Length", "0"))
-        return json.loads(self.rfile.read(size) or b"{}")
+        if size > 2_000_000:
+            raise ValueError("request body too large")
+        return self.rfile.read(size)
 
     def do_POST(self):
         parts = [p for p in self.path.split("/") if p]
@@ -256,6 +274,50 @@ class Handler(BaseHTTPRequestHandler):
                 if not tx_hash: return self.send_json(400, {"error": "tx_hash is required"})
                 result = verify_transaction(tx_hash, os.environ.get("CRYPTO_PAYMENT_ADDRESS", ""), data.get("amount_wei", ""))
                 return self.send_json(200, result)
+            if parts == ["api", "adtv", "revenue"]:
+                secret = os.environ.get("ADTV_REVENUE_WEBHOOK_SECRET", "")
+                raw = self.body_raw()
+                if not secret or not verify_revenue_signature(raw, self.headers.get("ADTV-Signature", ""), secret):
+                    return self.send_json(401, {"error": "invalid ADTV revenue signature"})
+                try: data = json.loads(raw.decode())
+                except (UnicodeDecodeError, json.JSONDecodeError): return self.send_json(400, {"error": "invalid JSON payload"})
+                event_id = str(data.get("event_id", "")).strip(); request_id = str(data.get("request_id", "")).strip()
+                try: usd_cents = int(data.get("usd_cents", 0)); bbt_amount = bbt_for_usd_cents(usd_cents)
+                except (TypeError, ValueError): usd_cents = 0; bbt_amount = 0
+                if not event_id or not request_id or usd_cents <= 0:
+                    return self.send_json(400, {"error": "event_id, request_id, and positive usd_cents are required"})
+                request = conn.execute("SELECT id FROM requests WHERE id=?", (request_id,)).fetchone()
+                if not request: return self.send_json(404, {"error": "request not found"})
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                    conn.execute("INSERT INTO adtv_revenue_events VALUES(?,?,?,?,?,?,?)", (event_id, request_id, usd_cents, bbt_amount, "credited", raw.decode(), now()))
+                    conn.execute("INSERT INTO bbt_ledger(request_id,entry_type,amount_bbt,source_ref,detail_json,created_at) VALUES(?,?,?,?,?,?)", (request_id, "adtv_revenue_credit", bbt_amount, event_id, raw.decode(), now()))
+                    conn.commit()
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+                    existing = conn.execute("SELECT event_id,request_id,bbt_amount,status FROM adtv_revenue_events WHERE event_id=?", (event_id,)).fetchone()
+                    return self.send_json(200, {"status": "already_credited", **dict(existing)})
+                return self.send_json(201, {"status": "credited", "event_id": event_id, "request_id": request_id, "bbt_amount": bbt_amount})
+            if len(parts) == 5 and parts[:3] == ["api", "public", "shares"] and parts[4] == "prepay":
+                share_token = parts[3]
+                share = conn.execute("SELECT request_id,expires_at,revoked FROM public_shares WHERE token=?", (share_token,)).fetchone()
+                if not share or share["revoked"] or share["expires_at"] < now(): return self.send_json(404, {"error": "share link expired or revoked"})
+                request_id = share["request_id"]
+                row = conn.execute("SELECT status,review_json,fee_json FROM requests WHERE id=?", (request_id,)).fetchone()
+                review = load_json(row["review_json"] if row else None); fee = load_json(row["fee_json"] if row else None)
+                if not row or review.get("decision") not in {"approve", "approve_with_conditions"} or not fee:
+                    return self.send_json(409, {"error": "approved fee offer required before prepayment"})
+                data = self.body(); fee_type = str(data.get("fee_type", "")).strip()
+                try: amount_bbt = int(data.get("amount_bbt", 0))
+                except (TypeError, ValueError): amount_bbt = 0
+                if not fee_type or amount_bbt <= 0: return self.send_json(400, {"error": "fee_type and positive amount_bbt are required"})
+                balance = conn.execute("SELECT COALESCE(SUM(amount_bbt),0) AS balance FROM bbt_ledger WHERE request_id=?", (request_id,)).fetchone()["balance"]
+                if amount_bbt > balance: return self.send_json(409, {"error": "insufficient BBT balance", "balance_bbt": balance})
+                source_ref = "prepay_" + secrets.token_urlsafe(18)
+                detail = {"fee_type": fee_type, "share_token_hash": hashlib.sha256(share_token.encode()).hexdigest()}
+                conn.execute("INSERT INTO bbt_ledger(request_id,entry_type,amount_bbt,source_ref,detail_json,created_at) VALUES(?,?,?,?,?,?)", (request_id, "client_fee_prepayment", -amount_bbt, source_ref, json.dumps(detail), now()))
+                conn.commit()
+                return self.send_json(201, {"status": "prepaid", "request_id": request_id, "fee_type": fee_type, "amount_bbt": amount_bbt, "balance_bbt": balance - amount_bbt})
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "poll":
                 if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 request_id = parts[2]
@@ -324,6 +386,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health": return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow"})
         if self.path == "/api/billing/plans": return self.send_json(200, {"plans": plan_catalog()})
         public_parts = [p for p in self.path.split("/") if p]
+        if len(public_parts) == 5 and public_parts[:3] == ["api", "public", "shares"] and public_parts[4] == "prepay":
+            conn = db()
+            share = conn.execute("SELECT request_id,expires_at,revoked FROM public_shares WHERE token=?", (public_parts[3],)).fetchone()
+            if not share or share["revoked"] or share["expires_at"] < now(): return self.send_json(404, {"error": "share link expired or revoked"})
+            row = conn.execute("SELECT status,review_json,fee_json FROM requests WHERE id=?", (share["request_id"],)).fetchone()
+            balance = conn.execute("SELECT COALESCE(SUM(amount_bbt),0) AS balance FROM bbt_ledger WHERE request_id=?", (share["request_id"],)).fetchone()["balance"]
+            return self.send_json(200, {"request_id": share["request_id"], "status": row["status"] if row else "unknown", "balance_bbt": balance, "fee_offer": load_json(row["fee_json"] if row else None), "review": load_json(row["review_json"] if row else None)})
         if len(public_parts) == 4 and public_parts[:3] == ["api", "public", "shares"]:
             conn = db()
             row = conn.execute("SELECT r.*,s.expires_at,s.revoked FROM requests r JOIN public_shares s ON s.request_id=r.id WHERE s.token=?", (public_parts[3],)).fetchone()

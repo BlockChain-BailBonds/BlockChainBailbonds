@@ -26,6 +26,12 @@ Environment:
 The portal login creates a 12-hour server-side session. Keep the legacy admin
 token only for controlled migration; new clients should use `/api/auth/login`.
 
+ADTV can credit a request through `POST /api/adtv/revenue` using an
+`ADTV-Signature: t=<unix>,v1=<hmac>` header. The payload must include a unique
+`event_id`, `request_id`, and positive `usd_cents`. Clients can view and spend
+the resulting BBT balance through their approved public share link at
+`/api/public/shares/<token>/prepay`.
+
 For production, replace SQLite with encrypted managed storage, put the service
 behind TLS and an identity provider, and obtain written authorization and a
 retention policy for every records source.

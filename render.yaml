@@ -39,6 +39,12 @@ services:
         sync: false
       - key: BAILBONDS_USER_AGENT
         value: 918-BailBonds/1.0
+      - key: ADTV_REVENUE_WEBHOOK_SECRET
+        sync: false
+      - key: BBT_UNITS_PER_USD_CENT
+        value: "1"
+      - key: BBT_ASSET_SYMBOL
+        value: BBT
     disk:
       name: bailbonds-data
       mountPath: /var/data

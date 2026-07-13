@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from backend.auth import hash_password, verify_password
+from backend.prepay import bbt_for_usd_cents, verify_revenue_signature
+import hashlib, hmac, time
 
 os.environ["BAILBONDS_ADMIN_TOKEN"] = "test-admin-token"
 with tempfile.TemporaryDirectory() as temp:
@@ -16,6 +18,13 @@ class WorkflowTests(unittest.TestCase):
         encoded = hash_password("a-strong-test-password")
         self.assertTrue(verify_password("a-strong-test-password", encoded))
         self.assertFalse(verify_password("wrong-password", encoded))
+
+    def test_adtv_revenue_signature_and_conversion(self):
+        payload = b'{"event_id":"evt_1","request_id":"req_1","usd_cents":250}'
+        ts = int(time.time()); secret = "adtv-test-secret"
+        sig = hmac.new(secret.encode(), f"{ts}.".encode() + payload, hashlib.sha256).hexdigest()
+        self.assertTrue(verify_revenue_signature(payload, f"t={ts},v1={sig}", secret))
+        self.assertEqual(bbt_for_usd_cents(250), 250)
 
     def test_consent_and_review_guards(self):
         intake = {"full_name": "Jane Doe", "date_of_birth": "1990-01-01", "phone": "9185550100", "consent": True}
