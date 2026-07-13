@@ -88,8 +88,10 @@ def normalize_match(payload: dict, intake: dict) -> dict:
                 "booking_match": booking_match,
                 "human_confirmation_required": True,
             })
+    mugshot_urls = [m.get("record", {}).get("mugshot_url") for m in matches if m.get("record", {}).get("mugshot_url")]
     return {"source_status": payload.get("status", "ok"), "matches": matches,
-            "checked_at": now(), "mugshot": "not_provided_by_source"}
+            "checked_at": now(), "mugshot": "available_for_human_confirmation" if mugshot_urls else "not_provided_by_source",
+            "mugshot_url": mugshot_urls[0] if mugshot_urls else None}
 
 
 def review_packet(intake: dict, source: dict) -> dict:
