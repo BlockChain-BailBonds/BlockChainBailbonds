@@ -30,7 +30,9 @@
         const source = detail.source || {};
         const confirmed = detail.review && ["approve", "approve_with_conditions"].includes(detail.review.decision);
         const mugshot = confirmed && source.mugshot_url ? `<img src="${esc(source.mugshot_url)}" alt="Confirmed source mugshot" style="max-width:120px">` : "Mugshot not provided or not human-confirmed";
-        return `<div class="p-3 border rounded mb-2"><strong>${esc(item.id)}</strong> — ${esc(item.status)} — ${esc(item.urgency)}<br><span>${esc(detail.packet?.explanation || "Human review required")}</span><br><span class="text-sm">${mugshot}</span></div>`;
+        const intake = detail.intake || {};
+        const report = (source.matches || []).map((match) => match.record || match);
+        return `<div class="p-3 border rounded mb-2"><strong>${esc(item.id)}</strong> — ${esc(item.status)} — ${esc(item.urgency)}<br><span>${esc(detail.packet?.explanation || "Human review required")}</span><br><span class="text-sm">${mugshot}</span><details class="mt-2"><summary>Intake and booking report</summary><h4>Client intake</h4><pre>${esc(JSON.stringify(intake, null, 2))}</pre><h4>Source report</h4><pre>${esc(JSON.stringify(report, null, 2))}</pre><p class="text-sm">Source match and identity still require bondsman confirmation.</p></details></div>`;
       }));
       root.innerHTML = plans() + card("Live intake consolidation", rows.join("") || "<p>No requests yet.</p>");
     } catch (error) {
