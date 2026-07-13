@@ -1,0 +1,26 @@
+{
+  "network": "REPLACE_WITH_APPROVED_MAINNET",
+  "chain_id": null,
+  "contracts": {
+    "audit_registry": "deploy-after-audit",
+    "device_registry": "deploy-after-audit",
+    "bondsman_registry": "deploy-after-audit",
+    "case_event_registry": "deploy-after-audit",
+    "usage_credits": "deploy-after-legal-review"
+  },
+  "controls": {
+    "minting_enabled": false,
+    "bail_and_collateral_custody": false,
+    "public_token_sale": false,
+    "required_multisig_signers": 2,
+    "timelock_seconds": 172800,
+    "emergency_pause": true
+  },
+  "human_approvals_required": [
+    "licensed_bondsman_operator",
+    "compliance_officer",
+    "smart_contract_auditor",
+    "reserve_custodian_or_payment_provider",
+    "legal_counsel"
+  ]
+}
