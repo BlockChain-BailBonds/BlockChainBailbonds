@@ -14,8 +14,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 try:
     from .billing import create_checkout, plan_catalog, verify_transaction
+    from .auth import admin_configured, new_session, verify_password
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
+    from auth import admin_configured, new_session, verify_password
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -57,6 +59,18 @@ def db() -> sqlite3.Connection:
       id TEXT PRIMARY KEY, bondsman_id TEXT NOT NULL, plan_id TEXT NOT NULL,
       status TEXT NOT NULL, provider_customer_id TEXT, provider_subscription_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+      role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS payment_events (
+      tx_hash TEXT PRIMARY KEY, wallet_address TEXT, plan_id TEXT, amount_wei TEXT,
+      status TEXT NOT NULL, created_at TEXT NOT NULL
     );
     """)
     return conn
@@ -142,6 +156,31 @@ def token_ok(headers) -> bool:
     return secrets.compare_digest(supplied, "Bearer " + ADMIN_TOKEN)
 
 
+def bearer(headers) -> str:
+    value = headers.get("Authorization", "")
+    return value[7:].strip() if value.startswith("Bearer ") else ""
+
+
+def session_user(conn, headers):
+    token = bearer(headers)
+    if not token:
+        return None
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    row = conn.execute("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked=0 AND s.expires_at>? AND u.active=1", (token_hash, now())).fetchone()
+    return dict(row) if row else None
+
+
+def staff_user(conn, headers):
+    if token_ok(headers):
+        return {"id": "legacy-admin", "email": "legacy-admin", "role": "admin"}
+    return session_user(conn, headers)
+
+
+def require_staff(conn, headers):
+    user = staff_user(conn, headers)
+    return user
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         return
@@ -171,30 +210,54 @@ class Handler(BaseHTTPRequestHandler):
         parts = [p for p in self.path.split("/") if p]
         conn = db()
         try:
+            if parts == ["api", "auth", "login"]:
+                data = self.body()
+                email = str(data.get("email", "")).strip().lower()
+                password = str(data.get("password", ""))
+                row = conn.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
+                if not row and admin_configured() and email == os.environ.get("BAILBONDS_ADMIN_EMAIL", "").lower():
+                    user_id = "usr_admin"
+                    conn.execute("INSERT OR IGNORE INTO users VALUES(?,?,?,?,1,?)", (user_id, email, os.environ["BAILBONDS_ADMIN_PASSWORD_HASH"], "admin", now()))
+                    conn.commit()
+                    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+                if not row or not verify_password(password, row["password_hash"]):
+                    return self.send_json(401, {"error": "invalid credentials"})
+                token, expires = new_session()
+                conn.execute("INSERT INTO sessions VALUES(?,?,?,?,0)", (hashlib.sha256(token.encode()).hexdigest(), row["id"], expires, now()))
+                conn.commit()
+                return self.send_json(200, {"token": token, "expires_at": expires, "user": {"id": row["id"], "email": row["email"], "role": row["role"]}})
+            if parts == ["api", "auth", "logout"]:
+                token = bearer(self.headers)
+                if token:
+                    conn.execute("UPDATE sessions SET revoked=1 WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)); conn.commit()
+                return self.send_json(204, {})
             if parts == ["api", "intake"]:
                 data = self.body()
-                if not data.get("consent"):
-                    return self.send_json(400, {"error": "explicit consent is required"})
+                required = ("full_name", "date_of_birth", "phone")
+                if not data.get("consent") or any(not str(data.get(key, "")).strip() for key in required):
+                    return self.send_json(400, {"error": "full_name, date_of_birth, phone, and explicit consent are required"})
+                if any(len(str(data.get(key, ""))) > 200 for key in required):
+                    return self.send_json(400, {"error": "intake field is too long"})
                 request_id = "req_" + secrets.token_urlsafe(12)
                 urgency = "emergency" if data.get("emergency") else "normal"
                 conn.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,?,?)",
                     (request_id, now(), "new", urgency, json.dumps(data), None, None, None, None))
-                audit(conn, request_id, "client", "intake_submitted", {"urgency": urgency})
+                audit(conn, request_id, "client", "intake_submitted", {"urgency": urgency, "consent_recorded_at": now()})
                 return self.send_json(201, {"request_id": request_id, "status": "new"})
             if parts == ["api", "billing", "checkout"]:
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body()
                 try: result = create_checkout(data.get("plan_id", ""), data.get("wallet_address", ""), data.get("success_url", ""), data.get("cancel_url", ""))
                 except ValueError as error: return self.send_json(400, {"error": str(error)})
                 return self.send_json(200, result)
             if parts == ["api", "billing", "crypto", "verify"]:
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body(); tx_hash = data.get("tx_hash", "")
                 if not tx_hash: return self.send_json(400, {"error": "tx_hash is required"})
                 result = verify_transaction(tx_hash, os.environ.get("CRYPTO_PAYMENT_ADDRESS", ""), data.get("amount_wei", ""))
                 return self.send_json(200, result)
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "poll":
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 request_id = parts[2]
                 row = conn.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
                 if not row: return self.send_json(404, {"error": "request not found"})
@@ -212,24 +275,34 @@ class Handler(BaseHTTPRequestHandler):
                     conn.commit()
                 return self.send_json(200, {"request_id": request_id, "source": source, "packet": packet})
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "review":
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body(); request_id = parts[2]
                 if data.get("decision") not in {"approve", "approve_with_conditions", "request_information", "decline"}:
                     return self.send_json(400, {"error": "invalid human decision"})
+                row = conn.execute("SELECT status FROM requests WHERE id=?", (request_id,)).fetchone()
+                if not row: return self.send_json(404, {"error": "request not found"})
+                if row["status"] not in {"new", "awaiting_match", "source_found"}:
+                    return self.send_json(409, {"error": "request is not awaiting review"})
                 conn.execute("UPDATE requests SET status=?,review_json=? WHERE id=?", ("reviewed", json.dumps(data), request_id))
-                audit(conn, request_id, "bondsman", "human_review_recorded", data)
+                audit(conn, request_id, user["email"], "human_review_recorded", data)
                 return self.send_json(200, {"request_id": request_id, "status": "reviewed"})
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "fee-offer":
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body(); request_id = parts[2]
                 required = {"bond_amount", "premium_amount", "currency", "schedule_name"}
-                if not required <= data.keys() or data.get("currency") != "USD":
+                try:
+                    bond_amount = float(data.get("bond_amount", 0)); premium_amount = float(data.get("premium_amount", 0))
+                except (TypeError, ValueError):
+                    bond_amount = -1; premium_amount = -1
+                if not required <= data.keys() or data.get("currency") != "USD" or bond_amount <= 0 or premium_amount < 0:
                     return self.send_json(400, {"error": "bondsman must provide a USD fee offer"})
                 conn.execute("UPDATE requests SET fee_json=? WHERE id=?", (json.dumps(data), request_id))
-                audit(conn, request_id, "bondsman", "fee_offer_recorded", {"schedule_name": data["schedule_name"]})
+                audit(conn, request_id, user["email"], "fee_offer_recorded", {"schedule_name": data["schedule_name"]})
                 return self.send_json(200, {"request_id": request_id, "fee_offer": data})
             if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "share":
-                if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 request_id = parts[2]
                 row = conn.execute("SELECT review_json,source_json FROM requests WHERE id=?", (request_id,)).fetchone()
                 if not row: return self.send_json(404, {"error": "request not found"})
@@ -265,9 +338,17 @@ class Handler(BaseHTTPRequestHandler):
             row = conn.execute("SELECT id,status,urgency,created_at FROM requests WHERE id=?", (public_parts[3],)).fetchone()
             if not row: return self.send_json(404, {"error": "request not found"})
             return self.send_json(200, dict(row))
-        if not token_ok(self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
-        parts = [p for p in self.path.split("/") if p]
+        parts = public_parts
         conn = db()
+        if parts == ["api", "auth", "me"]:
+            user = require_staff(conn, self.headers)
+            conn.close()
+            if not user: return self.send_json(401, {"error": "not authenticated"})
+            return self.send_json(200, {"user": {"id": user["id"], "email": user["email"], "role": user["role"]}})
+        if not require_staff(conn, self.headers):
+            conn.close()
+            return self.send_json(401, {"error": "bondsman authentication required"})
+        parts = [p for p in self.path.split("/") if p]
         if parts == ["api", "requests"]:
             rows = conn.execute("SELECT id,created_at,status,urgency FROM requests ORDER BY created_at DESC").fetchall()
             return self.send_json(200, {"requests": [dict(r) for r in rows]})

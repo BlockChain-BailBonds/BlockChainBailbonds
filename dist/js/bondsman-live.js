@@ -5,6 +5,7 @@
   const token = window.BAILBONDS_ADMIN_TOKEN || sessionStorage.getItem("bailbonds_admin_token") || "";
   const esc = (v) => String(v ?? "").replace(/[&<>\"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   function card(title, body) { return `<article class="card"><h3>${esc(title)}</h3>${body}</article>`; }
+  function loginCard() { return card("Licensed operator sign in", `<form id="bondsman-login" class="grid gap-3 max-w-md"><label>Email<input name="email" type="email" required autocomplete="username" class="input"></label><label>Password<input name="password" type="password" required autocomplete="current-password" class="input"></label><button class="btn btn-primary" type="submit">Sign in</button><p id="login-message" class="text-sm text-muted"></p></form>`); }
   function plans() {
     return card("Bondsman subscription", `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="p-4 border rounded"><strong>Starter</strong><p>Profile, basic intake, manual notes.</p><button data-plan="starter" class="btn btn-primary">Start plan</button></div>
@@ -27,15 +28,27 @@
       } catch (error) { alert(error.message || "Wallet payment cancelled or failed."); }
     }));
   }
+  function bindLogin(root) {
+    const form = root.querySelector("#bondsman-login");
+    if (!form) return;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = root.querySelector("#login-message");
+      const body = Object.fromEntries(new FormData(form).entries());
+      const response = await fetch(api + "/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) { message.textContent = result.error || "Sign in failed."; return; }
+      sessionStorage.setItem("bailbonds_admin_token", result.token);
+      location.reload();
+    });
+  }
   async function load() {
     const root = document.getElementById("live-bondsman-dashboard");
     if (!root) return;
+    if (!api) { root.innerHTML = card("Service unavailable", "<p>Configure the API endpoint before using the operator portal.</p>"); return; }
+    if (!token) { root.innerHTML = loginCard(); bindLogin(root); return; }
     root.innerHTML = plans() + card("Live intake consolidation", "<p>Loading...</p>");
     bindPlans(root);
-    if (!api || !token) {
-      root.innerHTML += card("Connection required", "<p>Configure the licensed bondsman API endpoint and session token to load live requests.</p>");
-      return;
-    }
     try {
       const headers = { Authorization: "Bearer " + token };
       const response = await fetch(api + "/requests", { headers });

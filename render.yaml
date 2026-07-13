@@ -2,19 +2,23 @@ services:
   - type: web
     name: blockchain-bailbonds-api
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: ""
     startCommand: python3 backend/server.py
     healthCheckPath: /health
     envVars:
       - key: BAILBONDS_ADMIN_TOKEN
         sync: false
+      - key: BAILBONDS_ADMIN_EMAIL
+        sync: false
+      - key: BAILBONDS_ADMIN_PASSWORD_HASH
+        sync: false
       - key: BAILBONDS_ALLOWED_ORIGIN
         value: https://blockchain-bailbonds.github.io
       - key: PUBLIC_APP_URL
         value: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
       - key: BAILBONDS_DB
-        value: /tmp/bailbonds/data.sqlite3
+        value: /var/data/data.sqlite3
       - key: CRYPTO_PAYMENT_ADDRESS
         sync: false
       - key: CRYPTO_RPC_URL
@@ -35,3 +39,7 @@ services:
         sync: false
       - key: BAILBONDS_USER_AGENT
         value: 918-BailBonds/1.0
+    disk:
+      name: bailbonds-data
+      mountPath: /var/data
+      sizeGB: 1

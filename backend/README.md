@@ -17,9 +17,14 @@ python3 backend/server.py
 Environment:
 
 - `BAILBONDS_ADMIN_TOKEN`: bearer token for bondsman/admin endpoints
+- `BAILBONDS_ADMIN_EMAIL`: bootstrap operator email for portal login
+- `BAILBONDS_ADMIN_PASSWORD_HASH`: PBKDF2 hash generated with `python3 -m backend.create_admin`
 - `BAILBONDS_DB`: SQLite path (default `backend/data.sqlite3`)
 - `TULSA_INMATE_API_URL`: optional inmate API base URL
 - `OSCN_SERVICE_URL`: optional internal OSCN worker URL
+
+The portal login creates a 12-hour server-side session. Keep the legacy admin
+token only for controlled migration; new clients should use `/api/auth/login`.
 
 For production, replace SQLite with encrypted managed storage, put the service
 behind TLS and an identity provider, and obtain written authorization and a
