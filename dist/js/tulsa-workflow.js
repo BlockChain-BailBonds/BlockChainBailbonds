@@ -6,6 +6,8 @@
   function showStatus(message) {
     const target = document.getElementById("processing-status");
     if (target) target.textContent = message;
+    const section = document.getElementById("processing-section");
+    if (section) section.hidden = false;
   }
   function watchRequest(requestId) {
     if (!API) return;
@@ -24,16 +26,6 @@
     const form = document.getElementById("emergency-form");
     if (!form || form.dataset.tulsaWorkflowInstalled) return;
     form.dataset.tulsaWorkflowInstalled = "1";
-    const phone = document.createElement("input");
-    phone.name = "phone";
-    phone.type = "tel";
-    phone.required = true;
-    phone.placeholder = "Callback phone number";
-    phone.className = "w-full border rounded p-2 mt-2";
-    const consent = document.createElement("label");
-    consent.className = "block mt-3 text-sm";
-    consent.innerHTML = '<input type="checkbox" name="consent" required> I consent to this request being shared with the assigned licensed bondsman and the configured records sources for case review.';
-    form.append(phone, consent);
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -44,7 +36,10 @@
         phone: data.get("phone"),
         emergency: true,
         consent: data.get("consent") === "on",
-        county: "Tulsa",
+        county: data.get("county") || "Tulsa",
+        booking_number: data.get("bookingNumber") || "",
+        location: { latitude: data.get("latitude") || null, longitude: data.get("longitude") || null },
+        wallet_address: data.get("walletAddress") || "",
         source: "918-bail-pwa"
       };
       try {
@@ -53,8 +48,11 @@
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to submit intake");
         showStatus("Request received. Waiting for Tulsa record review.");
+        const reference = document.getElementById("request-reference");
+        if (reference) reference.textContent = "Reference: " + result.request_id;
+        sessionStorage.setItem("bailbonds_request_id", result.request_id);
         watchRequest(result.request_id);
-        alert("Request received. A licensed bondsman will review it. Reference: " + result.request_id);
+        form.querySelector("button[type=submit]").disabled = true;
       } catch (error) {
         alert("The request could not be submitted: " + error.message);
       }
