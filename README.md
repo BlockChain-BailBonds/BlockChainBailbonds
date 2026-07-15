@@ -1,4 +1,15 @@
+---
+title: 918 Bail Bonds Live Demo
+emoji: ⚖️
+colorFrom: blue
+colorTo: red
+sdk: static
+app_port: 7860
+---
+
 # BlockChainBailbonds
+
+Live demo for the 918 bail workflow. The public UI polls realtime ADTV health data and can submit consented intake requests when a workflow API is configured.
 .....
 918-tech-blockchain-bailbonds-mvp-final/
 │

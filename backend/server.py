@@ -383,7 +383,31 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     def do_GET(self):
-        if self.path == "/health": return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow"})
+        path = urllib.parse.urlsplit(self.path).path
+        if path in {"/", "/index.html"}:
+            page = ROOT.parent / "index.html"
+            if page.exists():
+                raw = page.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+                return
+        if path in {"/health", "/api/health"}:
+            return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow", "time": now()})
+        if path == "/api/realtime":
+            adtv_url = os.environ.get("ADTV_BASE_URL", "https://adtv.onrender.com").rstrip("/") + "/api/health"
+            adtv = {"status": "unreachable"}
+            try:
+                with urllib.request.urlopen(adtv_url, timeout=5) as response:
+                    adtv = {"status": "ok", "http_status": response.status, "body": json.loads(response.read().decode())}
+            except Exception as error:
+                adtv = {"status": "unreachable", "error": type(error).__name__}
+            conn = db()
+            request_count = conn.execute("SELECT COUNT(*) AS count FROM requests").fetchone()["count"]
+            conn.close()
+            return self.send_json(200, {"service": "tulsa-bail-workflow", "time": now(), "request_count": request_count, "adtv": adtv})
         if self.path == "/api/billing/plans": return self.send_json(200, {"plans": plan_catalog()})
         public_parts = [p for p in self.path.split("/") if p]
         if len(public_parts) == 5 and public_parts[:3] == ["api", "public", "shares"] and public_parts[4] == "prepay":
