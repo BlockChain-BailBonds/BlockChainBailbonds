@@ -16,10 +16,12 @@ try:
     from .billing import create_checkout, plan_catalog, verify_transaction
     from .auth import admin_configured, new_session, verify_password
     from .prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
+    from .token_policy import resolve_token_tier
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
     from prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
+    from token_policy import resolve_token_tier
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -258,10 +260,20 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(400, {"error": "intake field is too long"})
                 request_id = "req_" + secrets.token_urlsafe(12)
                 urgency = "emergency" if data.get("emergency") else "normal"
+                token_policy = resolve_token_tier(
+                    data.get("token_918_balance", 0),
+                    data.get("bbt_balance", 0),
+                    verified=bool(data.get("token_balances_verified", False)),
+                )
                 conn.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,?,?)",
                     (request_id, now(), "new", urgency, json.dumps(data), None, None, None, None))
-                audit(conn, request_id, "client", "intake_submitted", {"urgency": urgency, "consent_recorded_at": now()})
-                return self.send_json(201, {"request_id": request_id, "status": "new"})
+                audit(conn, request_id, "client", "intake_submitted", {
+                    "urgency": urgency,
+                    "consent_recorded_at": now(),
+                    "token_tier": token_policy["tier"],
+                    "token_balances_verified": token_policy["verified"],
+                })
+                return self.send_json(201, {"request_id": request_id, "status": "new", "automation": token_policy})
             if parts == ["api", "billing", "checkout"]:
                 if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body()
@@ -396,6 +408,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
         if path in {"/health", "/api/health"}:
             return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow", "time": now()})
+        if path == "/api/token-policy":
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            policy = resolve_token_tier(
+                query.get("balance_918", ["0"])[0],
+                query.get("balance_bbt", ["0"])[0],
+                verified=False,
+            )
+            return self.send_json(200, policy)
         if path == "/api/realtime":
             adtv_url = os.environ.get("ADTV_BASE_URL", "https://adtv.onrender.com").rstrip("/") + "/api/health"
             adtv = {"status": "unreachable"}
