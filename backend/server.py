@@ -17,11 +17,13 @@ try:
     from .auth import admin_configured, new_session, verify_password
     from .prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
     from .token_policy import resolve_token_tier
+    from .public_booking import public_booking_records
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
     from prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
     from token_policy import resolve_token_tier
+    from public_booking import public_booking_records
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -408,6 +410,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
         if path in {"/health", "/api/health"}:
             return self.send_json(200, {"ok": True, "service": "tulsa-bail-workflow", "time": now()})
+        if path == "/api/public/bookings":
+            if not INMATE_API:
+                return self.send_json(200, {"status": "not_configured", "records": [], "fetched_at": now(), "source_cache_hours": 1})
+            try:
+                payload = source_get(INMATE_API, {})
+                records = public_booking_records(payload)
+                return self.send_json(200, {"status": "ok", "records": records, "count": len(records), "fetched_at": now(), "source_cache_hours": 1})
+            except Exception as error:
+                return self.send_json(200, {"status": "source_unavailable", "records": [], "fetched_at": now(), "error": type(error).__name__})
         if path == "/api/token-policy":
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             policy = resolve_token_tier(
