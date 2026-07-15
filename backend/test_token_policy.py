@@ -10,6 +10,14 @@ class TokenPolicyTests(unittest.TestCase):
         self.assertEqual(policy["max_preapproved_usd"], 0)
         self.assertFalse(policy["payment_authorized"])
 
+    def test_pegged_values_are_explicit(self):
+        policy = resolve_token_tier(1, 10, verified=True)
+        self.assertEqual(policy["peg_918_usd"], 1000)
+        self.assertEqual(policy["peg_bbt_usd"], 0.1)
+        self.assertEqual(policy["value_918_usd"], 1000)
+        self.assertEqual(policy["value_bbt_usd"], 1)
+        self.assertEqual(policy["total_utility_value_usd"], 1001)
+
     def test_zero_balance_only_captures_and_notifies(self):
         policy = resolve_token_tier(0, 0, verified=True)
         self.assertEqual(policy["tier"], "unfunded")
