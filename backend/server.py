@@ -18,12 +18,14 @@ try:
     from .prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
     from .token_policy import resolve_token_tier
     from .public_booking import public_booking_records
+    from .agreement import agreement_manifest, agreement_digest
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
     from prepay import bbt_for_usd_cents, load_json, verify_revenue_signature
     from token_policy import resolve_token_tier
     from public_booking import public_booking_records
+    from agreement import agreement_manifest, agreement_digest
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -483,6 +485,14 @@ class Handler(BaseHTTPRequestHandler):
             for key in ("source_json", "packet_json", "review_json", "fee_json"):
                 value = result.pop(key); result[key[:-5] if key.endswith("_json") else key] = json.loads(value) if value else None
             return self.send_json(200, result)
+        if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "agreement-manifest":
+            row = conn.execute("SELECT id,intake_json,review_json,fee_json FROM requests WHERE id=?", (parts[2],)).fetchone()
+            if not row:
+                conn.close()
+                return self.send_json(404, {"error": "request not found"})
+            manifest = agreement_manifest(row["id"], json.loads(row["intake_json"]), load_json(row["review_json"]), load_json(row["fee_json"]))
+            conn.close()
+            return self.send_json(200, {"manifest": manifest, "sha256": agreement_digest(manifest), "anchorable": bool(manifest["review_decision"] in {"approve", "approve_with_conditions"} and manifest["bond_amount"] is not None)})
         return self.send_json(404, {"error": "route not found"})
 
 

@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from backend.auth import hash_password, verify_password
 from backend.prepay import bbt_for_usd_cents, verify_revenue_signature
+from backend.agreement import agreement_manifest, agreement_digest
 import hashlib, hmac, time
 
 os.environ["BAILBONDS_ADMIN_TOKEN"] = "test-admin-token"
@@ -33,6 +34,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(packet["decision"], "human_review_required")
         self.assertTrue(packet["evidence"]["source_match_count"] == 1)
         self.assertIn("source_match_requires_bondsman_confirmation", packet["flags"])
+
+    def test_agreement_manifest_is_deterministic_and_public_safe(self):
+        manifest = agreement_manifest("req_1", {"county": "Tulsa", "full_name": "Private Person"}, {"decision": "approve"}, {"currency": "USD", "bond_amount": 5000, "premium_amount": 500, "schedule_name": "standard"})
+        self.assertNotIn("Private Person", json.dumps(manifest))
+        self.assertEqual(agreement_digest(manifest), agreement_digest(dict(manifest)))
+        self.assertEqual(manifest["funds_custody"], "off_chain_only")
 
 
 if __name__ == "__main__":

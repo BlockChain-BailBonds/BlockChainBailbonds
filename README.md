@@ -10,6 +10,19 @@ app_port: 7860
 # BlockChainBailbonds
 
 Live demo for the 918 bail workflow. The public UI polls realtime ADTV health data and can submit consented intake requests when a workflow API is configured.
+
+## so|bond-inspired agreement audit
+
+This app uses a narrow, non-custodial adaptation of the supplied so|bond model.
+`contracts/BailAgreementRegistry.sol` records agreement lifecycle attestations,
+participant approvals, freeze state, and hashes of off-chain evidence. It does
+not tokenize bail, custody money, replace a licensed bondsman, or make a legal,
+eligibility, payment, or court decision.
+
+After a request has a human bondsman decision and fee offer, staff can retrieve
+the public-safe manifest and digest at:
+
+`GET /api/requests/<request_id>/agreement-manifest`
 .....
 918-tech-blockchain-bailbonds-mvp-final/
 │
