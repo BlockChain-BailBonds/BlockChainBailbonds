@@ -43,11 +43,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(manifest["funds_custody"], "off_chain_only")
 
     def test_assessment_is_advisory_and_never_a_risk_decision(self):
-        result = assess_review_readiness({"full_name": "Jane Doe", "emergency": True}, {"matches": [{"id": "public-1"}]})
+        result = assess_review_readiness({"full_name": "Jane Doe", "date_of_birth": "1990-01-01", "phone": "9185550100", "consent": True, "emergency": True}, {"matches": [{"id": "public-1"}]})
         self.assertEqual(result["decision"], "human_review_required")
         self.assertEqual(result["workflow_priority"], "urgent")
         self.assertNotIn("risk_score", result)
         self.assertTrue(result["evidence_summary"]["human_source_confirmation_required"])
+        self.assertEqual(result["risk_assessment_suggestion"]["suggested_next_step"], "confirm_public_source_evidence_with_licensed_bondsman")
 
 
 if __name__ == "__main__":

@@ -33,6 +33,10 @@ the public-safe manifest and digest at:
 The Kaggle and Hugging Face demos use synthetic values and expose only
 non-binding workflow-readiness guidance. They do not provide a criminal-risk,
 detention, eligibility, pricing, or legal decision.
+
+Each assessment now includes a `risk_assessment_suggestion` containing a
+reasoned next workflow step: request missing information, confirm public-source
+evidence with a licensed bondsman, or escalate for licensed case review.
 .....
 918-tech-blockchain-bailbonds-mvp-final/
 │
