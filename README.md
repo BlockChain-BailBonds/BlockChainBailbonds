@@ -23,6 +23,16 @@ After a request has a human bondsman decision and fee offer, staff can retrieve
 the public-safe manifest and digest at:
 
 `GET /api/requests/<request_id>/agreement-manifest`
+
+## Published demos
+
+- GitHub Pages: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
+- Hugging Face static Space: https://huggingface.co/spaces/Nine1Eight/918-bailbonds-advisory-ai
+- Kaggle notebook: https://www.kaggle.com/code/wethepeople918/918-bail-bonds-advisory-ai-on-kaggle-gpu
+
+The Kaggle and Hugging Face demos use synthetic values and expose only
+non-binding workflow-readiness guidance. They do not provide a criminal-risk,
+detention, eligibility, pricing, or legal decision.
 .....
 918-tech-blockchain-bailbonds-mvp-final/
 │

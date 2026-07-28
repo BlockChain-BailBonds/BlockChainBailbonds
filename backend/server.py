@@ -19,6 +19,7 @@ try:
     from .token_policy import resolve_token_tier
     from .public_booking import public_booking_records
     from .agreement import agreement_manifest, agreement_digest
+    from .assessment import assess_review_readiness
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
@@ -26,6 +27,7 @@ except ImportError:
     from token_policy import resolve_token_tier
     from public_booking import public_booking_records
     from agreement import agreement_manifest, agreement_digest
+    from assessment import assess_review_readiness
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
@@ -277,7 +279,7 @@ class Handler(BaseHTTPRequestHandler):
                     "token_tier": token_policy["tier"],
                     "token_balances_verified": token_policy["verified"],
                 })
-                return self.send_json(201, {"request_id": request_id, "status": "new", "automation": token_policy})
+                return self.send_json(201, {"request_id": request_id, "status": "new", "automation": token_policy, "assessment": assess_review_readiness(data)})
             if parts == ["api", "billing", "checkout"]:
                 if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body()
@@ -493,6 +495,14 @@ class Handler(BaseHTTPRequestHandler):
             manifest = agreement_manifest(row["id"], json.loads(row["intake_json"]), load_json(row["review_json"]), load_json(row["fee_json"]))
             conn.close()
             return self.send_json(200, {"manifest": manifest, "sha256": agreement_digest(manifest), "anchorable": bool(manifest["review_decision"] in {"approve", "approve_with_conditions"} and manifest["bond_amount"] is not None)})
+        if len(parts) == 4 and parts[:2] == ["api", "requests"] and parts[3] == "assessment":
+            row = conn.execute("SELECT id,intake_json,source_json,review_json,fee_json FROM requests WHERE id=?", (parts[2],)).fetchone()
+            if not row:
+                conn.close()
+                return self.send_json(404, {"error": "request not found"})
+            assessment = assess_review_readiness(json.loads(row["intake_json"]), load_json(row["source_json"]), load_json(row["review_json"]), load_json(row["fee_json"]))
+            conn.close()
+            return self.send_json(200, {"request_id": row["id"], "assessment": assessment})
         return self.send_json(404, {"error": "route not found"})
 
 

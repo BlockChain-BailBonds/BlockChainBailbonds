@@ -6,6 +6,7 @@ from pathlib import Path
 from backend.auth import hash_password, verify_password
 from backend.prepay import bbt_for_usd_cents, verify_revenue_signature
 from backend.agreement import agreement_manifest, agreement_digest
+from backend.assessment import assess_review_readiness
 import hashlib, hmac, time
 
 os.environ["BAILBONDS_ADMIN_TOKEN"] = "test-admin-token"
@@ -40,6 +41,13 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("Private Person", json.dumps(manifest))
         self.assertEqual(agreement_digest(manifest), agreement_digest(dict(manifest)))
         self.assertEqual(manifest["funds_custody"], "off_chain_only")
+
+    def test_assessment_is_advisory_and_never_a_risk_decision(self):
+        result = assess_review_readiness({"full_name": "Jane Doe", "emergency": True}, {"matches": [{"id": "public-1"}]})
+        self.assertEqual(result["decision"], "human_review_required")
+        self.assertEqual(result["workflow_priority"], "urgent")
+        self.assertNotIn("risk_score", result)
+        self.assertTrue(result["evidence_summary"]["human_source_confirmation_required"])
 
 
 if __name__ == "__main__":
