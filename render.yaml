@@ -15,6 +15,8 @@ services:
         sync: false
       - key: BAILBONDS_ALLOWED_ORIGIN
         value: https://blockchain-bailbonds.github.io
+      - key: BAILBONDS_ENABLE_HSTS
+        value: "1"
       - key: PUBLIC_APP_URL
         value: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
       - key: BAILBONDS_DB
@@ -39,6 +41,10 @@ services:
         sync: false
       - key: BAILBONDS_USER_AGENT
         value: 918-BailBonds/1.0
+      - key: BAILBONDS_NOTIFICATION_WEBHOOK_URL
+        sync: false
+      - key: BAILBONDS_NOTIFICATION_WEBHOOK_SECRET
+        sync: false
       - key: ADTV_REVENUE_WEBHOOK_SECRET
         sync: false
       - key: BBT_UNITS_PER_USD_CENT

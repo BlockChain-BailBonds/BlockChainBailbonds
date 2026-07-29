@@ -8,8 +8,8 @@ import json, os, secrets, urllib.request
 
 PLANS = {
     "starter": {"name": "Starter", "price_env": "CRYPTO_PRICE_STARTER_WEI", "features": ["profile", "basic_intake", "manual_notes"]},
-    "professional": {"name": "Professional", "price_env": "CRYPTO_PRICE_PROFESSIONAL_WEI", "features": ["emergency_routing", "source_packets", "documents", "reminders"]},
-    "agency": {"name": "Agency", "price_env": "CRYPTO_PRICE_AGENCY_WEI", "features": ["staff_accounts", "county_routing", "analytics", "exports"]},
+    "professional": {"name": "Professional", "price_env": "CRYPTO_PRICE_PROFESSIONAL_WEI", "features": ["emergency_routing", "source_packets", "documents", "reminders", "booking_alerts"]},
+    "agency": {"name": "Agency", "price_env": "CRYPTO_PRICE_AGENCY_WEI", "features": ["staff_accounts", "county_routing", "analytics", "exports", "booking_alerts", "team_alerts"]},
 }
 
 def plan_catalog():

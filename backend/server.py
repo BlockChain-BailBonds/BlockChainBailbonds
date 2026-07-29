@@ -9,7 +9,7 @@ import secrets
 import sqlite3
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 try:
@@ -20,6 +20,8 @@ try:
     from .public_booking import public_booking_records
     from .agreement import agreement_manifest, agreement_digest
     from .assessment import assess_review_readiness
+    from .booking_alerts import booking_key, booking_fingerprint, changed_bookings
+    from .attention import block_receipt, choose_question, make_slots, participant_hash, verified_signature
 except ImportError:
     from billing import create_checkout, plan_catalog, verify_transaction
     from auth import admin_configured, new_session, verify_password
@@ -29,11 +31,18 @@ except ImportError:
     from agreement import agreement_manifest, agreement_digest
     from assessment import assess_review_readiness
 
+    from booking_alerts import booking_key, booking_fingerprint, changed_bookings
+    from attention import block_receipt, choose_question, make_slots, participant_hash, verified_signature
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BAILBONDS_DB", ROOT / "data.sqlite3"))
 ADMIN_TOKEN = os.environ.get("BAILBONDS_ADMIN_TOKEN", "")
 INMATE_API = os.environ.get("TULSA_INMATE_API_URL", "")
 OSCN_SERVICE = os.environ.get("OSCN_SERVICE_URL", "")
+TULSA_BOOKING_PORTAL_URL = os.environ.get("TULSA_BOOKING_PORTAL_URL", "https://community.365labs.com/f160b8ff-b432-4575-ad6d-6fddac1b1aaa/inmatelist")
+
+
+class BookingSourceMigrated(RuntimeError):
+    """The retired PDF export now redirects to a human-verified county portal."""
 
 
 def now() -> str:
@@ -46,6 +55,8 @@ def db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript("""
     PRAGMA journal_mode=WAL;
+    PRAGMA foreign_keys=ON;
+    PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS requests (
       id TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL,
       urgency TEXT NOT NULL, intake_json TEXT NOT NULL, source_json TEXT,
@@ -70,6 +81,21 @@ def db() -> sqlite3.Connection:
       status TEXT NOT NULL, provider_customer_id TEXT, provider_subscription_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS alert_preferences (
+      bondsman_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1,
+      counties_json TEXT NOT NULL DEFAULT '[]', channels_json TEXT NOT NULL DEFAULT '["portal"]',
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS booking_snapshots (
+      booking_key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, record_json TEXT NOT NULL,
+      first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS confirmed_bookings (
+      booking_number TEXT PRIMARY KEY, full_name TEXT NOT NULL,
+      bond_amount_cents INTEGER NOT NULL, booked_at TEXT, charges TEXT,
+      source_url TEXT NOT NULL, staff_user_id TEXT NOT NULL,
+      staff_email TEXT NOT NULL, notes TEXT, confirmed_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
       role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
@@ -93,6 +119,39 @@ def db() -> sqlite3.Connection:
       bbt_amount INTEGER NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS admin_toggles (
+      key TEXT PRIMARY KEY, enabled INTEGER NOT NULL, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS attention_campaigns (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, sponsor_name TEXT NOT NULL,
+      pledge_usd_cents INTEGER NOT NULL, provider_name TEXT NOT NULL,
+      question_bank_json TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS attention_blocks (
+      id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, participant_hash TEXT NOT NULL,
+      status TEXT NOT NULL, slots_json TEXT NOT NULL, verified_slots_json TEXT NOT NULL,
+      question_json TEXT, answer_attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, completed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS solidarity_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, block_id TEXT NOT NULL UNIQUE,
+      campaign_id TEXT NOT NULL, sponsor_name TEXT NOT NULL, usd_cents INTEGER NOT NULL,
+      status TEXT NOT NULL, provider_event_ids_json TEXT NOT NULL, created_at TEXT NOT NULL,
+      released_at TEXT, released_by TEXT
+    );
+    CREATE TABLE IF NOT EXISTS emergency_profiles (
+      id TEXT PRIMARY KEY, access_hash TEXT NOT NULL, profile_json TEXT NOT NULL,
+      assigned_bondsman_id TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS emergency_mandates (
+      id TEXT PRIMARY KEY, profile_id TEXT NOT NULL, request_id TEXT NOT NULL,
+      assigned_bondsman_id TEXT NOT NULL, status TEXT NOT NULL,
+      expires_at TEXT NOT NULL, activated_at TEXT NOT NULL, next_poll_at TEXT,
+      poll_attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, last_polled_at TEXT,
+      canceled_at TEXT
+    );
     """)
     return conn
 
@@ -114,7 +173,10 @@ def source_get(url: str, params: dict) -> dict:
         headers={"User-Agent": os.environ.get("BAILBONDS_USER_AGENT", "918-BailBonds/0.1")},
     )
     with urllib.request.urlopen(req, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
+        raw = response.read().decode("utf-8", errors="replace")
+    if "Tulsa County IIC has been replaced" in raw or "community.365labs.com" in raw:
+        raise BookingSourceMigrated("Tulsa County retired the PDF export; licensed staff must use the current county portal.")
+    return json.loads(raw)
 
 
 def oscn_lookup(intake: dict) -> dict:
@@ -170,6 +232,66 @@ def review_packet(intake: dict, source: dict) -> dict:
     }
 
 
+def queue_notification(conn, request_id: str, recipient: str, message: str, channel: str = "webhook") -> None:
+    conn.execute("INSERT INTO notifications(request_id,channel,recipient,message,status,created_at) VALUES(?,?,?,?,?,?)", (request_id, channel, recipient, message, "queued", now()))
+
+
+def readiness_profile(data: dict) -> dict:
+    required = ("full_name", "date_of_birth", "phone", "county")
+    if any(not str(data.get(key, "")).strip() for key in required):
+        raise ValueError("full_name, date_of_birth, phone, and county are required")
+    consents = data.get("consents") or {}
+    required_consents = {"public_booking_lookup", "share_with_assigned_bondsman", "emergency_activation"}
+    if not isinstance(consents, dict) or not all(consents.get(key) is True for key in required_consents):
+        raise ValueError("explicit public booking, bondsman sharing, and emergency activation consents are required")
+    contacts = data.get("emergency_contacts", [])
+    if not isinstance(contacts, list) or len(contacts) > 5:
+        raise ValueError("emergency_contacts must contain at most five contacts")
+    return {"full_name": str(data["full_name"]).strip(), "date_of_birth": str(data["date_of_birth"]).strip(),
+            "phone": str(data["phone"]).strip(), "county": str(data["county"]).strip(),
+            "booking_number": str(data.get("booking_number", "")).strip(), "emergency_contacts": contacts,
+            "consents": consents, "created_at": now()}
+
+
+def mandate_poll_interval(attempts: int) -> timedelta:
+    return timedelta(minutes=min(30, 5 * max(1, attempts)))
+
+
+def poll_emergency_mandate(conn, mandate_id: str) -> dict:
+    mandate = conn.execute("SELECT * FROM emergency_mandates WHERE id=?", (mandate_id,)).fetchone()
+    if not mandate or mandate["status"] != "active": return {"status": "not_active"}
+    if mandate["expires_at"] <= now():
+        conn.execute("UPDATE emergency_mandates SET status=?,next_poll_at=NULL WHERE id=?", ("expired", mandate_id)); conn.commit()
+        return {"status": "expired"}
+    profile = conn.execute("SELECT profile_json FROM emergency_profiles WHERE id=? AND active=1", (mandate["profile_id"],)).fetchone()
+    if not profile:
+        conn.execute("UPDATE emergency_mandates SET status=?,next_poll_at=NULL,last_error=? WHERE id=?", ("canceled", "profile_inactive", mandate_id)); conn.commit()
+        return {"status": "canceled"}
+    intake = json.loads(profile["profile_json"])
+    attempts = mandate["poll_attempts"] + 1
+    try:
+        payload = source_get(INMATE_API, {"name": intake["full_name"], "booking_number": intake.get("booking_number", "")})
+        source = normalize_match(payload, intake); source["oscn"] = oscn_lookup(intake)
+        packet = review_packet(intake, source)
+        next_poll = (datetime.now(timezone.utc) + mandate_poll_interval(attempts)).isoformat()
+        conn.execute("UPDATE requests SET status=?,source_json=?,packet_json=? WHERE id=?", ("source_found" if source["matches"] else "awaiting_match", json.dumps(source), json.dumps(packet), mandate["request_id"]))
+        conn.execute("UPDATE emergency_mandates SET poll_attempts=?,last_polled_at=?,next_poll_at=?,last_error=NULL WHERE id=?", (attempts, now(), next_poll, mandate_id))
+        if source["matches"]:
+            queue_notification(conn, mandate["request_id"], mandate["assigned_bondsman_id"], "Emergency mandate: possible public booking located; licensed human confirmation required.")
+            conn.execute("UPDATE emergency_mandates SET status=?,next_poll_at=NULL WHERE id=?", ("possible_match", mandate_id))
+        audit(conn, mandate["request_id"], "system", "emergency_mandate_polled", {"matches": len(source["matches"]), "attempt": attempts})
+        conn.commit()
+        return {"status": "possible_match" if source["matches"] else "searching", "matches": len(source["matches"])}
+    except BookingSourceMigrated:
+        queue_notification(conn, mandate["request_id"], mandate["assigned_bondsman_id"], "Emergency mandate needs a licensed staff portal lookup; the automated Tulsa export has migrated.")
+        conn.execute("UPDATE emergency_mandates SET status=?,next_poll_at=NULL,last_error=? WHERE id=?", ("portal_confirmation_required", "source_migrated", mandate_id)); conn.commit()
+        return {"status": "portal_confirmation_required", "portal_url": TULSA_BOOKING_PORTAL_URL}
+    except Exception as error:
+        next_poll = (datetime.now(timezone.utc) + mandate_poll_interval(attempts)).isoformat()
+        conn.execute("UPDATE emergency_mandates SET poll_attempts=?,last_polled_at=?,next_poll_at=?,last_error=? WHERE id=?", (attempts, now(), next_poll, type(error).__name__, mandate_id)); conn.commit()
+        return {"status": "source_unavailable", "error": type(error).__name__}
+
+
 def token_ok(headers) -> bool:
     if not ADMIN_TOKEN:
         return False
@@ -202,9 +324,77 @@ def require_staff(conn, headers):
     return user
 
 
+def admin_user(conn, headers):
+    user = staff_user(conn, headers)
+    return user if user and (user["role"] == "admin" or user["id"] == "legacy-admin") else None
+
+
+ATTENTION_TOGGLES = {
+    "attention_contributions": "Master switch for all public attention blocks.",
+    "attention_provider_callbacks": "Accept signed provider completion callbacks.",
+    "attention_fund_release": "Allow an admin to mark cleared sponsor pledges released to the fund.",
+}
+
+
+def toggle_enabled(conn, key: str) -> bool:
+    row = conn.execute("SELECT enabled FROM admin_toggles WHERE key=?", (key,)).fetchone()
+    return bool(row and row["enabled"])
+
+
+def attention_ready(conn) -> bool:
+    return toggle_enabled(conn, "attention_contributions") and toggle_enabled(conn, "attention_provider_callbacks")
+
+
+def subscription_for(conn, bondsman_id: str) -> dict:
+    row = conn.execute("SELECT plan_id,status,updated_at FROM subscriptions WHERE bondsman_id=? ORDER BY updated_at DESC LIMIT 1", (bondsman_id,)).fetchone()
+    return dict(row) if row else {"plan_id": None, "status": "inactive", "updated_at": None}
+
+
+def alert_access(conn, user: dict) -> bool:
+    """Only paid professional/agency plans can operate the booking monitor."""
+    subscription = subscription_for(conn, user["id"])
+    return subscription["status"] == "active" and subscription["plan_id"] in {"professional", "agency"}
+
+
+def sync_booking_alerts(conn, bondsman_id: str) -> dict:
+    if not INMATE_API:
+        return {"status": "not_configured", "records": [], "alerts_created": 0}
+    payload = source_get(INMATE_API, {})
+    records = public_booking_records(payload)
+    known = {row["booking_key"]: row["fingerprint"] for row in conn.execute("SELECT booking_key,fingerprint FROM booking_snapshots")}
+    changed = changed_bookings(records, known)
+    checked_at = now()
+    for record in records:
+        key, fingerprint = booking_key(record), booking_fingerprint(record)
+        conn.execute("INSERT INTO booking_snapshots VALUES(?,?,?,?,?) ON CONFLICT(booking_key) DO UPDATE SET fingerprint=excluded.fingerprint,record_json=excluded.record_json,last_seen_at=excluded.last_seen_at", (key, fingerprint, json.dumps(record), checked_at, checked_at))
+    prefs = conn.execute("SELECT enabled,counties_json,channels_json FROM alert_preferences WHERE bondsman_id=?", (bondsman_id,)).fetchone()
+    enabled = bool(prefs and prefs["enabled"])
+    counties = set(json.loads(prefs["counties_json"])) if prefs else set()
+    channels = json.loads(prefs["channels_json"]) if prefs else ["portal"]
+    allowed = {str(c).lower() for c in counties}
+    deliverable = [r for r in changed if not allowed or str(r.get("county", "")).lower() in allowed]
+    if enabled:
+        for record in deliverable:
+            for channel in channels:
+                conn.execute("INSERT INTO notifications(request_id,channel,recipient,message,status,created_at) VALUES(?,?,?,?,?,?)", (booking_key(record), channel, bondsman_id, "New or updated public booking record requires licensed bondsman review.", "queued", checked_at))
+    conn.commit()
+    return {"status": "ok", "records_checked": len(records), "alerts_created": len(deliverable) * len(channels) if enabled else 0, "changed_records": deliverable, "fetched_at": checked_at}
+
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, *_):
         return
+
+    def security_headers(self):
+        """Headers appropriate for sensitive, no-cache workflow responses."""
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        if os.environ.get("BAILBONDS_ENABLE_HSTS") == "1":
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
     def send_json(self, status, body):
         raw = json.dumps(body).encode()
@@ -212,6 +402,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", os.environ.get("BAILBONDS_ALLOWED_ORIGIN", "http://127.0.0.1:8787"))
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header("Vary", "Origin")
+        self.security_headers()
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -221,6 +413,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", os.environ.get("BAILBONDS_ALLOWED_ORIGIN", "http://127.0.0.1:8787"))
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Vary", "Origin")
+        self.security_headers()
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def body(self):
@@ -257,6 +452,40 @@ class Handler(BaseHTTPRequestHandler):
                 if token:
                     conn.execute("UPDATE sessions SET revoked=1 WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)); conn.commit()
                 return self.send_json(204, {})
+            if parts == ["api", "emergency", "profiles"]:
+                data = self.body()
+                try: profile = readiness_profile(data)
+                except ValueError as error: return self.send_json(400, {"error": str(error)})
+                assigned = str(data.get("assigned_bondsman_id", "")).strip()
+                user = conn.execute("SELECT id FROM users WHERE id=? AND active=1", (assigned,)).fetchone()
+                if assigned != "legacy-admin" and not user: return self.send_json(400, {"error": "assigned_bondsman_id must be an active, configured licensed staff account"})
+                profile_id, access_token = "profile_" + secrets.token_urlsafe(12), secrets.token_urlsafe(32)
+                conn.execute("INSERT INTO emergency_profiles VALUES(?,?,?,?,?,?,?)", (profile_id, hashlib.sha256(access_token.encode()).hexdigest(), json.dumps(profile), assigned, 1, now(), now()))
+                conn.commit()
+                return self.send_json(201, {"profile_id": profile_id, "activation_token": access_token, "status": "ready", "notice": "Store this activation token securely. It can activate or cancel the emergency mandate."})
+            if len(parts) == 5 and parts[:3] == ["api", "emergency", "profiles"] and parts[4] == "activate":
+                profile_id = parts[3]; data = self.body(); token = str(data.get("activation_token", ""))
+                profile_row = conn.execute("SELECT * FROM emergency_profiles WHERE id=? AND active=1", (profile_id,)).fetchone()
+                if not profile_row or not secrets.compare_digest(profile_row["access_hash"], hashlib.sha256(token.encode()).hexdigest()): return self.send_json(401, {"error": "valid activation token required"})
+                hours = data.get("mandate_hours", 24)
+                try: hours = int(hours)
+                except (TypeError, ValueError): hours = 0
+                if not 1 <= hours <= 72: return self.send_json(400, {"error": "mandate_hours must be between 1 and 72"})
+                mandate_id, request_id = "mandate_" + secrets.token_urlsafe(12), "req_" + secrets.token_urlsafe(12)
+                intake = json.loads(profile_row["profile_json"]); intake["emergency"] = True; intake["emergency_mandate_id"] = mandate_id
+                expires = datetime.now(timezone.utc) + timedelta(hours=hours)
+                conn.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,?,?)", (request_id, now(), "emergency_activated", "emergency", json.dumps(intake), None, None, None, None))
+                conn.execute("INSERT INTO emergency_mandates VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (mandate_id, profile_id, request_id, profile_row["assigned_bondsman_id"], "active", expires.isoformat(), now(), now(), 0, None, None, None))
+                queue_notification(conn, request_id, profile_row["assigned_bondsman_id"], "Emergency mandate activated. Server-side booking lookup has started.")
+                audit(conn, request_id, "client", "emergency_mandate_activated", {"profile_id": profile_id, "expires_at": expires.isoformat()})
+                conn.commit()
+                return self.send_json(201, {"mandate_id": mandate_id, "request_id": request_id, "status": "active", "expires_at": expires.isoformat()})
+            if len(parts) == 5 and parts[:3] == ["api", "emergency", "mandates"] and parts[4] == "cancel":
+                mandate_id = parts[3]; data = self.body(); token = str(data.get("activation_token", ""))
+                row = conn.execute("SELECT m.*,p.access_hash FROM emergency_mandates m JOIN emergency_profiles p ON p.id=m.profile_id WHERE m.id=?", (mandate_id,)).fetchone()
+                if not row or not secrets.compare_digest(row["access_hash"], hashlib.sha256(token.encode()).hexdigest()): return self.send_json(401, {"error": "valid activation token required"})
+                conn.execute("UPDATE emergency_mandates SET status=?,canceled_at=?,next_poll_at=NULL WHERE id=?", ("canceled", now(), mandate_id)); conn.commit()
+                return self.send_json(200, {"mandate_id": mandate_id, "status": "canceled"})
             if parts == ["api", "intake"]:
                 data = self.body()
                 required = ("full_name", "date_of_birth", "phone")
@@ -287,11 +516,50 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as error: return self.send_json(400, {"error": str(error)})
                 return self.send_json(200, result)
             if parts == ["api", "billing", "crypto", "verify"]:
-                if not require_staff(conn, self.headers): return self.send_json(401, {"error": "bondsman authentication required"})
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "bondsman authentication required"})
                 data = self.body(); tx_hash = data.get("tx_hash", "")
                 if not tx_hash: return self.send_json(400, {"error": "tx_hash is required"})
                 result = verify_transaction(tx_hash, os.environ.get("CRYPTO_PAYMENT_ADDRESS", ""), data.get("amount_wei", ""))
+                plan_id = str(data.get("plan_id", ""))
+                if result.get("status") == "confirmed" and plan_id in {"starter", "professional", "agency"}:
+                    subscription_id = "sub_" + secrets.token_urlsafe(12)
+                    conn.execute("INSERT INTO subscriptions VALUES(?,?,?,?,?,?,?,?)", (subscription_id, user["id"], plan_id, "active", data.get("wallet_address"), tx_hash, now(), now()))
+                    conn.commit()
+                    result["subscription"] = subscription_for(conn, user["id"])
                 return self.send_json(200, result)
+            if parts == ["api", "operator", "alerts", "preferences"]:
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "bondsman authentication required"})
+                if not alert_access(conn, user): return self.send_json(402, {"error": "an active Professional or Agency subscription is required"})
+                data = self.body(); counties = data.get("counties", []); channels = data.get("channels", ["portal"])
+                if not isinstance(counties, list) or not isinstance(channels, list) or any(c not in {"portal", "webhook"} for c in channels): return self.send_json(400, {"error": "counties and supported channels are required"})
+                conn.execute("INSERT INTO alert_preferences VALUES(?,?,?,?,?) ON CONFLICT(bondsman_id) DO UPDATE SET enabled=excluded.enabled,counties_json=excluded.counties_json,channels_json=excluded.channels_json,updated_at=excluded.updated_at", (user["id"], int(bool(data.get("enabled", True))), json.dumps(counties), json.dumps(channels), now()))
+                conn.commit(); return self.send_json(200, {"status": "saved", "enabled": bool(data.get("enabled", True)), "counties": counties, "channels": channels})
+            if parts == ["api", "operator", "bookings", "sync"]:
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "bondsman authentication required"})
+                if not alert_access(conn, user): return self.send_json(402, {"error": "an active Professional or Agency subscription is required"})
+                try: return self.send_json(200, sync_booking_alerts(conn, user["id"]))
+                except Exception as error: return self.send_json(502, {"error": "booking source unavailable", "detail": type(error).__name__})
+            if parts == ["api", "operator", "bookings", "manual"]:
+                user = require_staff(conn, self.headers)
+                if not user: return self.send_json(401, {"error": "licensed staff authentication required"})
+                data = self.body()
+                booking_number = str(data.get("booking_number", "")).strip()
+                full_name = str(data.get("full_name", "")).strip()
+                try: bond_amount_cents = int(round(float(data.get("bond_amount", 0)) * 100))
+                except (TypeError, ValueError): bond_amount_cents = 0
+                if not booking_number or not full_name or bond_amount_cents <= 0 or not data.get("staff_confirmed"):
+                    return self.send_json(400, {"error": "booking_number, full_name, positive bond_amount, and staff_confirmed are required"})
+                if len(booking_number) > 100 or len(full_name) > 200 or len(str(data.get("charges", ""))) > 2000:
+                    return self.send_json(400, {"error": "booking fields are too long"})
+                source_url = str(data.get("source_url") or TULSA_BOOKING_PORTAL_URL)
+                conn.execute("INSERT INTO confirmed_bookings VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(booking_number) DO UPDATE SET full_name=excluded.full_name,bond_amount_cents=excluded.bond_amount_cents,booked_at=excluded.booked_at,charges=excluded.charges,source_url=excluded.source_url,staff_user_id=excluded.staff_user_id,staff_email=excluded.staff_email,notes=excluded.notes,confirmed_at=excluded.confirmed_at", (booking_number, full_name, bond_amount_cents, str(data.get("booked_at", "")), str(data.get("charges", "")), source_url, user["id"], user["email"], str(data.get("notes", "")), now()))
+                audit(conn, "booking:" + booking_number, user["email"], "portal_booking_confirmed", {"bond_amount_cents": bond_amount_cents, "source_url": source_url})
+                conn.execute("INSERT INTO notifications(request_id,channel,recipient,message,status,created_at) VALUES(?,?,?,?,?,?)", ("booking:" + booking_number, "portal", user["id"], "Staff-confirmed Tulsa booking imported; human bondsman review required.", "queued", now()))
+                conn.commit()
+                return self.send_json(201, {"booking_number": booking_number, "status": "staff_confirmed", "bond_amount_cents": bond_amount_cents, "review_required": True})
             if parts == ["api", "adtv", "revenue"]:
                 secret = os.environ.get("ADTV_REVENUE_WEBHOOK_SECRET", "")
                 raw = self.body_raw()
@@ -342,7 +610,11 @@ class Handler(BaseHTTPRequestHandler):
                 row = conn.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
                 if not row: return self.send_json(404, {"error": "request not found"})
                 intake = json.loads(row["intake_json"])
-                payload = source_get(INMATE_API, {"name": intake.get("full_name", "")})
+                try:
+                    payload = source_get(INMATE_API, {"name": intake.get("full_name", "")})
+                except BookingSourceMigrated:
+                    audit(conn, request_id, "system", "booking_source_migrated", {"portal_url": TULSA_BOOKING_PORTAL_URL})
+                    return self.send_json(503, {"error": "Tulsa booking export migrated to a human-verified portal", "portal_url": TULSA_BOOKING_PORTAL_URL, "next_action": "A licensed staff member must complete the county portal verification and confirm the record."})
                 source = normalize_match(payload, intake)
                 source["oscn"] = oscn_lookup(intake)
                 packet = review_packet(intake, source)
@@ -390,12 +662,75 @@ class Handler(BaseHTTPRequestHandler):
                 if review.get("decision") not in {"approve", "approve_with_conditions"}:
                     return self.send_json(409, {"error": "booking must be human-confirmed before sharing"})
                 token = secrets.token_urlsafe(24)
-                from datetime import timedelta
                 expires = datetime.now(timezone.utc) + timedelta(hours=24)
                 conn.execute("INSERT INTO public_shares VALUES(?,?,?,?,0)", (token, request_id, now(), expires.isoformat()))
                 conn.commit()
                 base = os.environ.get("PUBLIC_APP_URL", "")
                 return self.send_json(201, {"share_token": token, "share_url": base + "?share=" + token if base else "?share=" + token, "expires_at": expires.isoformat()})
+            if parts == ["api", "admin", "toggles"]:
+                user = admin_user(conn, self.headers)
+                if not user: return self.send_json(403, {"error": "administrator authentication required"})
+                data = self.body(); key = str(data.get("key", "")); enabled = data.get("enabled")
+                if key not in ATTENTION_TOGGLES or not isinstance(enabled, bool):
+                    return self.send_json(400, {"error": "supported toggle key and boolean enabled are required", "supported": ATTENTION_TOGGLES})
+                conn.execute("INSERT INTO admin_toggles VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=excluded.updated_at", (key, int(enabled), user["email"], now()))
+                conn.commit()
+                return self.send_json(200, {"key": key, "enabled": enabled, "updated_by": user["email"]})
+            if parts == ["api", "admin", "attention", "campaigns"]:
+                user = admin_user(conn, self.headers)
+                if not user: return self.send_json(403, {"error": "administrator authentication required"})
+                data = self.body(); question_bank = data.get("question_bank", [])
+                try: choose_question(question_bank); pledge = int(data.get("pledge_usd_cents", 0))
+                except (ValueError, TypeError): return self.send_json(400, {"error": "a valid question_bank and positive pledge_usd_cents are required"})
+                if pledge <= 0 or not str(data.get("name", "")).strip() or not str(data.get("sponsor_name", "")).strip() or not str(data.get("provider_name", "")).strip():
+                    return self.send_json(400, {"error": "name, sponsor_name, provider_name, and positive pledge_usd_cents are required"})
+                campaign_id = "camp_" + secrets.token_urlsafe(12)
+                conn.execute("INSERT INTO attention_campaigns VALUES(?,?,?,?,?,?,?,?,?)", (campaign_id, data["name"].strip(), data["sponsor_name"].strip(), pledge, data["provider_name"].strip(), json.dumps(question_bank), int(bool(data.get("active", False))), now(), now()))
+                conn.commit()
+                return self.send_json(201, {"campaign_id": campaign_id, "active": bool(data.get("active", False))})
+            if parts == ["api", "attention", "blocks"]:
+                if not attention_ready(conn): return self.send_json(503, {"error": "attention contributions are not accepting participants"})
+                data = self.body(); campaign_id = str(data.get("campaign_id", "")); participant = str(data.get("participant_nonce", ""))
+                campaign = conn.execute("SELECT * FROM attention_campaigns WHERE id=? AND active=1", (campaign_id,)).fetchone()
+                if not campaign or len(participant) < 16: return self.send_json(400, {"error": "active campaign_id and a participant nonce are required"})
+                block_id = "attn_" + secrets.token_urlsafe(16); slots = make_slots()
+                conn.execute("INSERT INTO attention_blocks VALUES(?,?,?,?,?,?,?,?,?)", (block_id, campaign_id, participant_hash(participant), "awaiting_provider", json.dumps(slots), "[]", None, 0, now(), None))
+                conn.commit()
+                return self.send_json(201, block_receipt(block_id, campaign_id, "awaiting_provider", slots))
+            if parts == ["api", "attention", "provider", "verified"]:
+                if not toggle_enabled(conn, "attention_provider_callbacks"): return self.send_json(503, {"error": "provider callbacks are disabled"})
+                secret = os.environ.get("ATTENTION_PROVIDER_WEBHOOK_SECRET", ""); raw = self.body_raw()
+                if not verified_signature(raw, self.headers.get("Attention-Signature", ""), secret): return self.send_json(401, {"error": "invalid provider signature"})
+                data = json.loads(raw.decode()); block_id = str(data.get("block_id", "")); slot_id = str(data.get("slot_id", "")); event_id = str(data.get("event_id", ""))
+                block = conn.execute("SELECT * FROM attention_blocks WHERE id=?", (block_id,)).fetchone()
+                if not block or not event_id or slot_id not in json.loads(block["slots_json"]): return self.send_json(400, {"error": "unknown block, slot, or provider event"})
+                verified = json.loads(block["verified_slots_json"])
+                if event_id not in [item["event_id"] for item in verified]: verified.append({"slot_id": slot_id, "event_id": event_id})
+                status = "ready_for_question" if len({item["slot_id"] for item in verified}) == 5 else "awaiting_provider"
+                question = choose_question(json.loads(conn.execute("SELECT question_bank_json FROM attention_campaigns WHERE id=?", (block["campaign_id"],)).fetchone()["question_bank_json"])) if status == "ready_for_question" and not block["question_json"] else json.loads(block["question_json"]) if block["question_json"] else None
+                conn.execute("UPDATE attention_blocks SET status=?,verified_slots_json=?,question_json=? WHERE id=?", (status, json.dumps(verified), json.dumps(question) if question else None, block_id)); conn.commit()
+                return self.send_json(200, block_receipt(block_id, block["campaign_id"], status, json.loads(block["slots_json"]), question if status == "ready_for_question" else None))
+            if parts == ["api", "attention", "blocks", "answer"]:
+                data = self.body(); block_id = str(data.get("block_id", "")); answer = data.get("answer_index")
+                block = conn.execute("SELECT b.*,c.sponsor_name,c.pledge_usd_cents FROM attention_blocks b JOIN attention_campaigns c ON c.id=b.campaign_id WHERE b.id=?", (block_id,)).fetchone()
+                if not block or block["status"] != "ready_for_question" or not isinstance(answer, int): return self.send_json(409, {"error": "a ready attention block and answer_index are required"})
+                question = json.loads(block["question_json"]); correct = secrets.compare_digest(str(answer), str(question["answer_index"]))
+                if not correct:
+                    conn.execute("UPDATE attention_blocks SET status=?,answer_attempts=answer_attempts+1 WHERE id=?", ("attention_not_verified", block_id)); conn.commit()
+                    return self.send_json(200, {"block_id": block_id, "status": "attention_not_verified", "funding_notice": "No sponsor pledge was recorded."})
+                conn.execute("UPDATE attention_blocks SET status=?,completed_at=? WHERE id=?", ("pledged", now(), block_id))
+                conn.execute("INSERT INTO solidarity_ledger(block_id,campaign_id,sponsor_name,usd_cents,status,provider_event_ids_json,created_at) VALUES(?,?,?,?,?,?,?)", (block_id, block["campaign_id"], block["sponsor_name"], block["pledge_usd_cents"], "pledged", block["verified_slots_json"], now()))
+                conn.commit()
+                return self.send_json(200, {"block_id": block_id, "status": "pledged", "funding_notice": "A sponsor pledge was recorded for the independent solidarity fund; no participant reward was created."})
+            if len(parts) == 5 and parts[:3] == ["api", "admin", "attention"] and parts[3] == "ledger" and parts[4] == "release":
+                user = admin_user(conn, self.headers)
+                if not user: return self.send_json(403, {"error": "administrator authentication required"})
+                if not toggle_enabled(conn, "attention_fund_release"): return self.send_json(503, {"error": "fund release is disabled"})
+                data = self.body(); block_id = str(data.get("block_id", ""))
+                row = conn.execute("SELECT * FROM solidarity_ledger WHERE block_id=?", (block_id,)).fetchone()
+                if not row or row["status"] != "pledged": return self.send_json(409, {"error": "a pledged ledger entry is required"})
+                conn.execute("UPDATE solidarity_ledger SET status=?,released_at=?,released_by=? WHERE block_id=?", ("released", now(), user["email"], block_id)); conn.commit()
+                return self.send_json(200, {"block_id": block_id, "status": "released", "usd_cents": row["usd_cents"]})
             return self.send_json(404, {"error": "route not found"})
         finally:
             conn.close()
@@ -408,6 +743,7 @@ class Handler(BaseHTTPRequestHandler):
                 raw = page.read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.security_headers()
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()
                 self.wfile.write(raw)
@@ -421,6 +757,8 @@ class Handler(BaseHTTPRequestHandler):
                 payload = source_get(INMATE_API, {})
                 records = public_booking_records(payload)
                 return self.send_json(200, {"status": "ok", "records": records, "count": len(records), "fetched_at": now(), "source_cache_hours": 1})
+            except BookingSourceMigrated:
+                return self.send_json(503, {"status": "source_migrated", "records": [], "count": None, "fetched_at": now(), "portal_url": TULSA_BOOKING_PORTAL_URL, "message": "Tulsa County retired the automated PDF export. Use the official portal for human-verified lookup."})
             except Exception as error:
                 return self.send_json(200, {"status": "source_unavailable", "records": [], "fetched_at": now(), "error": type(error).__name__})
         if path == "/api/token-policy":
@@ -444,6 +782,13 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
             return self.send_json(200, {"service": "tulsa-bail-workflow", "time": now(), "request_count": request_count, "adtv": adtv})
         if self.path == "/api/billing/plans": return self.send_json(200, {"plans": plan_catalog()})
+        if path == "/api/attention/status":
+            conn = db()
+            accepting = attention_ready(conn)
+            totals = conn.execute("SELECT COALESCE(SUM(usd_cents),0) AS pledged_cents,COALESCE(SUM(CASE WHEN status='released' THEN usd_cents ELSE 0 END),0) AS released_cents FROM solidarity_ledger").fetchone()
+            campaign_count = conn.execute("SELECT COUNT(*) AS count FROM attention_campaigns WHERE active=1").fetchone()["count"]
+            conn.close()
+            return self.send_json(200, {"accepting_participants": accepting, "active_campaigns": campaign_count, "pledged_usd_cents": totals["pledged_cents"], "released_usd_cents": totals["released_cents"], "notice": "No participant receives cash, tokens, bail credit, priority, or an eligibility decision."})
         public_parts = [p for p in self.path.split("/") if p]
         if len(public_parts) == 5 and public_parts[:3] == ["api", "public", "shares"] and public_parts[4] == "prepay":
             conn = db()
@@ -476,7 +821,31 @@ class Handler(BaseHTTPRequestHandler):
         if not require_staff(conn, self.headers):
             conn.close()
             return self.send_json(401, {"error": "bondsman authentication required"})
-        parts = [p for p in self.path.split("/") if p]
+        parts = [p for p in urllib.parse.urlsplit(self.path).path.split("/") if p]
+        user = require_staff(conn, self.headers)
+        if parts == ["api", "admin", "attention", "status"]:
+            if not admin_user(conn, self.headers): return self.send_json(403, {"error": "administrator authentication required"})
+            toggles = {key: toggle_enabled(conn, key) for key in ATTENTION_TOGGLES}
+            rows = conn.execute("SELECT id,name,sponsor_name,pledge_usd_cents,provider_name,active,created_at FROM attention_campaigns ORDER BY created_at DESC").fetchall()
+            ledger = conn.execute("SELECT block_id,campaign_id,sponsor_name,usd_cents,status,created_at,released_at FROM solidarity_ledger ORDER BY id DESC LIMIT 100").fetchall()
+            return self.send_json(200, {"toggles": toggles, "campaigns": [dict(row) for row in rows], "ledger": [dict(row) for row in ledger]})
+        if parts == ["api", "operator", "subscription"]:
+            return self.send_json(200, {"subscription": subscription_for(conn, user["id"]), "monitor_enabled": alert_access(conn, user)})
+        if parts == ["api", "operator", "alerts"]:
+            rows = conn.execute("SELECT id,request_id,channel,message,status,created_at FROM notifications WHERE recipient=? ORDER BY id DESC LIMIT 100", (user["id"],)).fetchall()
+            return self.send_json(200, {"alerts": [dict(row) for row in rows]})
+        if parts == ["api", "operator", "bookings", "confirmed"]:
+            rows = conn.execute("SELECT booking_number,full_name,bond_amount_cents,booked_at,charges,source_url,staff_email,confirmed_at FROM confirmed_bookings ORDER BY confirmed_at DESC LIMIT 500").fetchall()
+            return self.send_json(200, {"records": [dict(row) for row in rows], "source": "licensed_staff_portal_confirmation"})
+        if parts == ["api", "operator", "bookings", "confirmed-summary"]:
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try: max_cents = int(round(float(query.get("max_bond_amount", ["10000"])[0]) * 100))
+            except (TypeError, ValueError): return self.send_json(400, {"error": "max_bond_amount must be numeric"})
+            row = conn.execute("SELECT COUNT(*) AS count,COALESCE(SUM(bond_amount_cents),0) AS total_cents FROM confirmed_bookings WHERE bond_amount_cents<=?", (max_cents,)).fetchone()
+            return self.send_json(200, {"count": row["count"], "total_bond_amount_cents": row["total_cents"], "max_bond_amount_cents": max_cents, "source": "licensed_staff_portal_confirmation", "notice": "This is a staff-confirmed subset, not a complete live jail population."})
+        if parts == ["api", "operator", "bookings"]:
+            rows = conn.execute("SELECT booking_key,record_json,first_seen_at,last_seen_at FROM booking_snapshots ORDER BY last_seen_at DESC LIMIT 500").fetchall()
+            return self.send_json(200, {"records": [{**dict(row), "record": json.loads(row["record_json"])} for row in rows]})
         if parts == ["api", "requests"]:
             rows = conn.execute("SELECT id,created_at,status,urgency FROM requests ORDER BY created_at DESC").fetchall()
             return self.send_json(200, {"requests": [dict(r) for r in rows]})

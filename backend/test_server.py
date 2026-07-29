@@ -12,7 +12,7 @@ import hashlib, hmac, time
 os.environ["BAILBONDS_ADMIN_TOKEN"] = "test-admin-token"
 with tempfile.TemporaryDirectory() as temp:
     os.environ["BAILBONDS_DB"] = str(Path(temp) / "test.sqlite3")
-    from backend.server import db, normalize_match, review_packet
+from backend.server import BookingSourceMigrated, db, normalize_match, readiness_profile, review_packet, source_get
 
 
 class WorkflowTests(unittest.TestCase):
@@ -49,6 +49,22 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("risk_score", result)
         self.assertTrue(result["evidence_summary"]["human_source_confirmation_required"])
         self.assertEqual(result["risk_assessment_suggestion"]["suggested_next_step"], "confirm_public_source_evidence_with_licensed_bondsman")
+
+    def test_retired_tulsa_export_is_reported_as_a_migration(self):
+        from unittest.mock import patch
+        class Response:
+            def read(self): return b"<h2>Tulsa County IIC has been replaced</h2>"
+            def __enter__(self): return self
+            def __exit__(self, *_): return None
+        with patch("backend.server.urllib.request.urlopen", return_value=Response()):
+            with self.assertRaises(BookingSourceMigrated):
+                source_get("https://example.test", {})
+
+    def test_emergency_readiness_requires_explicit_scoped_consents(self):
+        profile = readiness_profile({"full_name": "Jane Doe", "date_of_birth": "1990-01-01", "phone": "9185550100", "county": "Tulsa", "consents": {"public_booking_lookup": True, "share_with_assigned_bondsman": True, "emergency_activation": True}, "emergency_contacts": []})
+        self.assertEqual("Jane Doe", profile["full_name"])
+        with self.assertRaises(ValueError):
+            readiness_profile({"full_name": "Jane Doe", "date_of_birth": "1990-01-01", "phone": "9185550100", "county": "Tulsa", "consents": {"public_booking_lookup": True}})
 
 
 if __name__ == "__main__":
