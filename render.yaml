@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: blockchain-bailbonds-api
+    runtime: python
+    plan: starter
+    buildCommand: ""
+    startCommand: python3 backend/server.py
+    healthCheckPath: /health
+    envVars:
+      - key: BAILBONDS_ADMIN_TOKEN
+        sync: false
+      - key: BAILBONDS_ADMIN_EMAIL
+        sync: false
+      - key: BAILBONDS_ADMIN_PASSWORD_HASH
+        sync: false
+      - key: BAILBONDS_ALLOWED_ORIGIN
+        value: https://blockchain-bailbonds.github.io
+      - key: BAILBONDS_ENABLE_HSTS
+        value: "1"
+      - key: PUBLIC_APP_URL
+        value: https://blockchain-bailbonds.github.io/BlockChainBailbonds/
+      - key: BAILBONDS_DB
+        value: /var/data/data.sqlite3
+      - key: CRYPTO_PAYMENT_ADDRESS
+        sync: false
+      - key: CRYPTO_RPC_URL
+        sync: false
+      - key: CRYPTO_CHAIN_ID
+        value: 0x1
+      - key: CRYPTO_ASSET
+        value: native
+      - key: CRYPTO_PRICE_STARTER_WEI
+        sync: false
+      - key: CRYPTO_PRICE_PROFESSIONAL_WEI
+        sync: false
+      - key: CRYPTO_PRICE_AGENCY_WEI
+        sync: false
+      - key: TULSA_INMATE_API_URL
+        sync: false
+      - key: OSCN_SERVICE_URL
+        sync: false
+      - key: BAILBONDS_USER_AGENT
+        value: 918-BailBonds/1.0
+      - key: BAILBONDS_NOTIFICATION_WEBHOOK_URL
+        sync: false
+      - key: BAILBONDS_NOTIFICATION_WEBHOOK_SECRET
+        sync: false
+      - key: ADTV_REVENUE_WEBHOOK_SECRET
+        sync: false
+      - key: BBT_UNITS_PER_USD_CENT
+        value: "1"
+      - key: BBT_ASSET_SYMBOL
+        value: BBT
+    disk:
+      name: bailbonds-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="description" content="918 Technologies BlockChain BailBonds - Distributed Domain Architecture">
+  <title>918 Technologies - Domain Architecture</title>
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    /* Base styles */
+    :root {
+      --primary: #1e40af;  /* Deep blue */
+      --primary-hover: #1e3a8a;
+      --accent: #f97316;   /* Orange for emphasis */
+      --accent-hover: #ea580c;
+      --destructive: #dc2626;  /* Red for warnings */
+      --success: #16a34a;  /* Green for success */
+      --background: #f8fafc;
+      --foreground: #0f172a;
+      --card: #ffffff;
+      --card-foreground: #0f172a;
+      --border: #e2e8f0;
+      --muted: #f1f5f9;
+      --muted-foreground: #64748b;
+      --radius: 0.5rem;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+    }
+
+    .text-xs {
+      font-size: 0.75rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+    }
+
+    .text-xl {
+      font-size: 1.25rem;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+    }
+
+    .text-primary {
+      color: var(--primary);
+    }
+
+    .text-destructive {
+      color: var(--destructive);
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-muted {
+      color: var(--muted-foreground);
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    /* Layout */
+    .flex {
+      display: flex;
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .items-start {
+      align-items: flex-start;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-1 {
+      gap: 0.25rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .gap-3 {
+      gap: 0.75rem;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .gap-6 {
+      gap: 1.5rem;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+
+    .mb-8 {
+      margin-bottom: 2rem;
+    }
+
+    .mb-12 {
+      margin-bottom: 3rem;
+    }
+
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+
+    .ml-2 {
+      margin-left: 0.5rem;
+    }
+
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+
+    .mt-4 {
+      margin-top: 1rem;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .p-4 {
+      padding: 1rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-3 {
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    /* Components */
+    .hidden {
+      display: none !important;
+    }
+
+    .card {
+      background-color: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      border-radius: var(--radius);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-accent:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-destructive {
+      background-color: var(--destructive);
+      color: white;
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground);
+    }
+
+    .btn-outline:hover {
+      background-color: var(--muted);
+    }
+
+    .border-t {
+      border-top: 1px solid var(--border);
+    }
+
+    .border-b {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rounded {
+      border-radius: var(--radius);
+    }
+
+    .domain-icon {
+      font-size: 2rem;
+      padding: 1rem;
+      border-radius: 50%;
+      background-color: var(--muted);
+      margin-bottom: 1rem;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .blockchain-color {
+      color: #2563eb;
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+
+    .crypto-color {
+      color: #f59e0b;
+      background-color: rgba(245, 158, 11, 0.1);
+    }
+
+    .nft-color {
+      color: #8b5cf6;
+      background-color: rgba(139, 92, 246, 0.1);
+    }
+
+    .wallet-color {
+      color: #10b981;
+      background-color: rgba(16, 185, 129, 0.1);
+    }
+
+    .x-color {
+      color: #ef4444;
+      background-color: rgba(239, 68, 68, 0.1);
+    }
+
+    .domain-line {
+      position: relative;
+    }
+
+    .domain-line::before {
+      content: '';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      width: 2px;
+      height: 30px;
+      background-color: var(--border);
+    }
+
+    .domain-line-horizontal::before {
+      content: '';
+      position: absolute;
+      top: -50px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background-color: var(--border);
+    }
+
+    .domain-line-horizontal::after {
+      content: '';
+      position: absolute;
+      top: -50px;
+      left: 50%;
+      width: 2px;
+      height: 20px;
+      background-color: var(--border);
+    }
+
+    .domain-flow {
+      position: relative;
+      margin-top: 80px;
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      
+      .grid-cols-5 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="bg-white border-b py-4 mb-6">
+    <div class="container flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="text-primary text-3xl">
+          <i class="fas fa-link-slash"></i>
+        </div>
+        <div>
+          <h2 class="text-primary mb-0">918 Technologies</h2>
+          <p class="text-xs text-muted">BlockChain BailBonds</p>
+        </div>
+      </div>
+      <div>
+        <nav>
+          <ul class="flex gap-4">
+            <li><a href="index.html" class="text-primary">Home</a></li>
+            <li><a href="bondsman-portal.html" class="text-primary">Bondsman Portal</a></li>
+            <li><a href="#" class="text-primary font-medium">Domain Architecture</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container pb-12">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold mb-2">Multi-Domain Architecture</h1>
+      <p class="text-muted">How 918 Technologies BlockChain BailBonds leverages multiple Unstoppable Domains</p>
+    </div>
+
+    <!-- Domain Structure Diagram -->
+    <div class="card mb-8">
+      <div class="text-center mb-6">
+        <div class="domain-icon blockchain-color mx-auto">
+          <i class="fas fa-cube"></i>
+        </div>
+        <h3 class="font-bold">Nine1Eight.blockchain</h3>
+        <p class="text-sm text-muted">Primary Domain - Contract Generation</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 domain-flow">
+        <div class="domain-line domain-line-horizontal">
+          <div class="domain-icon crypto-color mx-auto">
+            <i class="fas fa-coins"></i>
+          </div>
+          <h3 class="font-bold text-center">Nine1Eight.crypto</h3>
+          <p class="text-sm text-muted text-center">Payment Processing</p>
+        </div>
+
+        <div class="domain-line domain-line-horizontal">
+          <div class="domain-icon nft-color mx-auto">
+            <i class="fas fa-image"></i>
+          </div>
+          <h3 class="font-bold text-center">Nine1Eight.nft</h3>
+          <p class="text-sm text-muted text-center">Contract Verification</p>
+        </div>
+
+        <div class="domain-line domain-line-horizontal">
+          <div class="domain-icon wallet-color mx-auto">
+            <i class="fas fa-wallet"></i>
+          </div>
+          <h3 class="font-bold text-center">Nine1Eight.wallet</h3>
+          <p class="text-sm text-muted text-center">Wallet Integration</p>
+        </div>
+
+        <div class="domain-line domain-line-horizontal">
+          <div class="domain-icon x-color mx-auto">
+            <i class="fas fa-handshake"></i>
+          </div>
+          <h3 class="font-bold text-center">Nine1Eight.x</h3>
+          <p class="text-sm text-muted text-center">Bondsman Network</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Domain Functionality -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Nine1Eight.blockchain</h2>
+        <div class="domain-icon blockchain-color mb-4">
+          <i class="fas fa-cube"></i>
+        </div>
+        <h4 class="font-medium mb-2">Primary Domain - Hub & Contract Engine</h4>
+        <ul class="mb-4 space-y-2 text-sm">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Main user entry point with emergency "I'm Going To JAIL!" button</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Collects and stores initial user information</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Generates smart contracts for bail bonds</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Coordinates with other domains for complete service</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Monitors jail booking databases for detainee tracking</span>
+          </li>
+        </ul>
+        <div class="bg-gray-100 p-4 rounded text-sm">
+          <p class="font-medium mb-1">Primary Technologies:</p>
+          <p>Smart Contract Deployment, Automated Scanner Systems, Web3 Authentication</p>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Nine1Eight.crypto</h2>
+        <div class="domain-icon crypto-color mb-4">
+          <i class="fas fa-coins"></i>
+        </div>
+        <h4 class="font-medium mb-2">Payment Processing System</h4>
+        <ul class="mb-4 space-y-2 text-sm">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Handles all cryptocurrency payments and escrow services</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Multi-token support for bail bond payments</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Automatic fee calculation based on bail amount</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Secure escrow system to hold funds until release is confirmed</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Bondsman payment disbursement system</span>
+          </li>
+        </ul>
+        <div class="bg-gray-100 p-4 rounded text-sm">
+          <p class="font-medium mb-1">Primary Technologies:</p>
+          <p>Multi-chain Payment Gateway, Escrow Smart Contracts, Fee Calculator</p>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Nine1Eight.nft</h2>
+        <div class="domain-icon nft-color mb-4">
+          <i class="fas fa-image"></i>
+        </div>
+        <h4 class="font-medium mb-2">Contract Verification & Documentation</h4>
+        <ul class="mb-4 space-y-2 text-sm">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Generates unique NFT for each bail bond contract</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Stores all legal documentation as immutable records</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Provides verification portal for court officials</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Creates digital proof of contract execution</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Maintains audit trail of all contract activities</span>
+          </li>
+        </ul>
+        <div class="bg-gray-100 p-4 rounded text-sm">
+          <p class="font-medium mb-1">Primary Technologies:</p>
+          <p>NFT Minting, IPFS Document Storage, Digital Signatures</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Nine1Eight.wallet</h2>
+        <div class="domain-icon wallet-color mb-4">
+          <i class="fas fa-wallet"></i>
+        </div>
+        <h4 class="font-medium mb-2">Wallet Integration & Management</h4>
+        <ul class="mb-4 space-y-2 text-sm">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Manages user and bondsman wallet connections</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Provides emergency wallet proxy services</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Handles signature requests for contract execution</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Multi-wallet compatibility (MetaMask, Trust Wallet, etc.)</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Pre-authorized emergency transactions for when user has no device access</span>
+          </li>
+        </ul>
+        <div class="bg-gray-100 p-4 rounded text-sm">
+          <p class="font-medium mb-1">Primary Technologies:</p>
+          <p>Web3 Wallet Connect, Proxy Signing System, Multi-chain Support</p>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2 class="text-xl font-bold mb-4">Nine1Eight.x</h2>
+        <div class="domain-icon x-color mb-4">
+          <i class="fas fa-handshake"></i>
+        </div>
+        <h4 class="font-medium mb-2">Bondsman Network & Services</h4>
+        <ul class="mb-4 space-y-2 text-sm">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Bondsman portal for account management and subscription</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Real-time notification system for new bail opportunities</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Tier-based subscription services for bondsmen</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Geographic coverage management and assignments</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-success mt-1"></i>
+            <span>Bondsman reputation and performance tracking system</span>
+          </li>
+        </ul>
+        <div class="bg-gray-100 p-4 rounded text-sm">
+          <p class="font-medium mb-1">Primary Technologies:</p>
+          <p>Notification APIs, Reputation Oracle, Service Level Management</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Journey Across Domains -->
+    <div class="card">
+      <h2 class="text-xl font-bold mb-6">User Journey Across Domains</h2>
+      
+      <div class="mb-6">
+        <h3 class="font-medium mb-3">1. Emergency Initiation</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.blockchain</span></p>
+            <p class="text-sm">User presses "I'm Going To JAIL!" button and authorizes location access</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.wallet</span></p>
+            <p class="text-sm">User connects wallet and pre-authorizes emergency transactions</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Action:</p>
+            <p class="text-sm">User enters personal information and system is activated</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <h3 class="font-medium mb-3">2. Detention Processing</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.blockchain</span></p>
+            <p class="text-sm">System monitors jail booking databases to detect user's booking</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.nft</span></p>
+            <p class="text-sm">Creates immutable record of booking details as they appear</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Action:</p>
+            <p class="text-sm">Records are verified and stored for bail bond preparation</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <h3 class="font-medium mb-3">3. Bondsman Assignment</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.x</span></p>
+            <p class="text-sm">Notifies eligible bondsmen based on location and tier</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.blockchain</span></p>
+            <p class="text-sm">Prepares bail bond smart contract with verified details</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Action:</p>
+            <p class="text-sm">Bondsman accepts assignment and commits to the contract</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <h3 class="font-medium mb-3">4. Contract & Payment Processing</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.crypto</span></p>
+            <p class="text-sm">Executes pre-authorized payment to cover bail fee from user wallet</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.wallet</span></p>
+            <p class="text-sm">Uses proxy signature system to complete transaction without user device</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Action:</p>
+            <p class="text-sm">Funds are placed in escrow pending successful release process</p>
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <h3 class="font-medium mb-3">5. Release Process</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.x</span></p>
+            <p class="text-sm">Bondsman confirms they've posted bail with the detention facility</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.nft</span></p>
+            <p class="text-sm">Generates verified NFT certificate of bail bond completion</p>
+          </div>
+          <div class="p-4 rounded bg-gray-100">
+            <p class="font-medium">Domain: <span class="text-primary">Nine1Eight.crypto</span></p>
+            <p class="text-sm">Releases payment from escrow to bondsman upon confirmation of release</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 mt-8 border-t text-sm text-muted bg-white">
+    <div class="container">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          &copy; <span id="current-year"></span> 918 Technologies Inc. All rights reserved.
+        </div>
+        <div class="flex gap-4">
+          <a href="#" class="text-primary">Terms</a>
+          <a href="#" class="text-primary">Privacy</a>
+          <a href="#" class="text-primary">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    // Set current year in footer
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

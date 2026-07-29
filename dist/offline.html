@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - 918 Technologies Bail Bonds</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <style>
+    :root {
+      --primary-color: #1e40af;
+      --accent-color: #f97316;
+      --destructive-color: #dc2626;
+      --success-color: #16a34a;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background-color: #f4f4f5;
+    }
+    
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    
+    .offline-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      color: var(--primary-color);
+    }
+    
+    h1 {
+      margin-bottom: 1rem;
+    }
+    
+    .card {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+    
+    .actions {
+      margin-top: 2rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.375rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: #1e3a8a;
+    }
+    
+    .btn-outline {
+      background-color: transparent;
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+    
+    .btn-outline:hover {
+      background-color: #e6f0ff;
+    }
+    
+    footer {
+      background-color: white;
+      padding: 1rem;
+      text-align: center;
+      font-size: 0.875rem;
+      color: #6b7280;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>918 Technologies Bail Bonds</h1>
+  </header>
+  
+  <main>
+    <div class="card">
+      <div class="offline-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+          <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+      </div>
+      <h2>You're Offline</h2>
+      <p>You are currently offline and cannot access this page. Some cached features of the application will still work, including previously loaded bail contracts and emergency features.</p>
+      
+      <div class="actions">
+        <button class="btn btn-primary" onclick="window.location.reload()">Try Again</button>
+        <a href="/" class="btn btn-outline">Go to Homepage</a>
+      </div>
+    </div>
+  </main>
+  
+  <footer>
+    <p>&copy; <span id="current-year">2025</span> 918 Technologies Inc. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Update copyright year
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+    
+    // Check network status and reload if back online
+    window.addEventListener('online', () => {
+      window.location.reload();
+    });
+    
+    // Register service worker if not already registered
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      console.log('Service worker already controlling this page');
+    }
+  </script>
+</body>
+</html>

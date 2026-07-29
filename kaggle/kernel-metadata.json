@@ -1,0 +1,14 @@
+{
+  "id": "wethepeople918/918-bail-bonds-advisory-ai-on-kaggle-gpu",
+  "title": "918 Bail Bonds Advisory AI on Kaggle GPU",
+  "code_file": "918-bailbonds-advisory-ai-gpu.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "expected_output": "Safe, explainable workflow-readiness packet on synthetic examples."
+}

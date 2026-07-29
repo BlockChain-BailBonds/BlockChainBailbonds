@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="description" content="918 Technologies BlockChain BailBonds - Interactive Domain Connection Wizard">
+  <title>Domain Connection Wizard - 918 Technologies</title>
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    /* Base styles */
+    :root {
+      --primary: #1e40af;  /* Deep blue */
+      --primary-hover: #1e3a8a;
+      --accent: #f97316;   /* Orange for emphasis */
+      --accent-hover: #ea580c;
+      --destructive: #dc2626;  /* Red for warnings */
+      --success: #16a34a;  /* Green for success */
+      --background: #f8fafc;
+      --foreground: #0f172a;
+      --card: #ffffff;
+      --card-foreground: #0f172a;
+      --border: #e2e8f0;
+      --muted: #f1f5f9;
+      --muted-foreground: #64748b;
+      --radius: 0.5rem;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+    }
+
+    .text-xs {
+      font-size: 0.75rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+    }
+
+    .text-xl {
+      font-size: 1.25rem;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+    }
+
+    .text-primary {
+      color: var(--primary);
+    }
+
+    .text-destructive {
+      color: var(--destructive);
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-muted {
+      color: var(--muted-foreground);
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    /* Layout */
+    .flex {
+      display: flex;
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .items-start {
+      align-items: flex-start;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-1 {
+      gap: 0.25rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .gap-3 {
+      gap: 0.75rem;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .gap-6 {
+      gap: 1.5rem;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+
+    .mb-8 {
+      margin-bottom: 2rem;
+    }
+
+    .mb-12 {
+      margin-bottom: 3rem;
+    }
+
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+
+    .ml-2 {
+      margin-left: 0.5rem;
+    }
+
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+
+    .mt-4 {
+      margin-top: 1rem;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .p-4 {
+      padding: 1rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-3 {
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    /* Components */
+    .hidden {
+      display: none !important;
+    }
+
+    .card {
+      background-color: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      border-radius: var(--radius);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-accent:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-destructive {
+      background-color: var(--destructive);
+      color: white;
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground);
+    }
+
+    .btn-outline:hover {
+      background-color: var(--muted);
+    }
+
+    .border-t {
+      border-top: 1px solid var(--border);
+    }
+
+    .border-b {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rounded {
+      border-radius: var(--radius);
+    }
+
+    /* Wizard Specific Styles */
+    .wizard-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .step-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      position: relative;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .step-indicator::before {
+      content: "";
+      position: absolute;
+      top: 15px;
+      left: 30px;
+      right: 30px;
+      height: 2px;
+      background: var(--border);
+      z-index: 1;
+    }
+
+    .step {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--background);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .step-label {
+      position: absolute;
+      top: 35px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
+
+    .step.active {
+      background-color: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .step.active .step-label {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .step.completed {
+      background-color: var(--success);
+      color: white;
+      border-color: var(--success);
+    }
+
+    .step.completed .step-label {
+      color: var(--success);
+    }
+
+    .wizard-content {
+      min-height: 400px;
+    }
+
+    .wizard-navigation {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    /* Domain Icons & Styling */
+    .domain-icon {
+      font-size: 2rem;
+      padding: 1rem;
+      border-radius: 50%;
+      background-color: var(--muted);
+      margin-bottom: 1rem;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .blockchain-color {
+      color: #2563eb;
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+
+    .crypto-color {
+      color: #f59e0b;
+      background-color: rgba(245, 158, 11, 0.1);
+    }
+
+    .nft-color {
+      color: #8b5cf6;
+      background-color: rgba(139, 92, 246, 0.1);
+    }
+
+    .wallet-color {
+      color: #10b981;
+      background-color: rgba(16, 185, 129, 0.1);
+    }
+
+    .x-color {
+      color: #ef4444;
+      background-color: rgba(239, 68, 68, 0.1);
+    }
+
+    .domain-connection-line {
+      height: 60px;
+      width: 2px;
+      background-color: var(--border);
+      margin: 10px auto;
+      position: relative;
+    }
+
+    .domain-connection-line::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: -4px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--border);
+    }
+
+    .domain-connected .domain-connection-line {
+      background-color: var(--success);
+    }
+
+    .domain-connected .domain-connection-line::after {
+      background-color: var(--success);
+    }
+
+    .domain-card {
+      background-color: white;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .domain-card.connected {
+      border-color: var(--success);
+      box-shadow: 0 0 0 1px var(--success);
+    }
+
+    .domain-status {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-top: 0.5rem;
+    }
+
+    .status-connected {
+      background-color: rgba(22, 163, 74, 0.1);
+      color: var(--success);
+    }
+
+    .status-disconnected {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: var(--destructive);
+    }
+
+    .domain-detail-panel {
+      background-color: var(--muted);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-top: 1rem;
+      text-align: left;
+    }
+
+    /* Console Output Styling */
+    .console-output {
+      background-color: #1e1e1e;
+      color: #ffffff;
+      font-family: monospace;
+      padding: 1rem;
+      border-radius: var(--radius);
+      height: 200px;
+      overflow-y: auto;
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .console-line {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+    }
+
+    .console-success {
+      color: #4ade80;
+    }
+
+    .console-error {
+      color: #f87171;
+    }
+
+    .console-warning {
+      color: #fbbf24;
+    }
+
+    .console-info {
+      color: #60a5fa;
+    }
+
+    /* Animation */
+    .slide-in {
+      animation: slideIn 0.5s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Connection animation */
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    .connection-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--success);
+      border-radius: 50%;
+      position: absolute;
+      z-index: 5;
+    }
+
+    .connection-animating .connection-dot {
+      animation: moveDot 2s linear infinite;
+    }
+
+    @keyframes moveDot {
+      0% { transform: translateY(0px); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(60px); opacity: 0; }
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      
+      .grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      
+      .grid-cols-5 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Header -->
+  <header class="bg-white border-b py-4 mb-6">
+    <div class="container flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="text-primary text-3xl">
+          <i class="fas fa-link-slash"></i>
+        </div>
+        <div>
+          <h2 class="text-primary mb-0">918 Technologies</h2>
+          <p class="text-xs text-muted">BlockChain BailBonds</p>
+        </div>
+      </div>
+      <div>
+        <nav>
+          <ul class="flex gap-4">
+            <li><a href="index.html" class="text-primary">Home</a></li>
+            <li><a href="bondsman-portal.html" class="text-primary">Bondsman Portal</a></li>
+            <li><a href="domain-structure.html" class="text-primary">Domain Architecture</a></li>
+            <li><a href="#" class="text-primary font-medium">Connection Wizard</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container pb-12">
+    <div class="wizard-container">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold mb-2">Domain Connection Wizard</h1>
+        <p class="text-muted">Set up and connect your Unstoppable Domains for 918 Technologies BlockChain BailBonds</p>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <div class="step active" id="step-1">
+          1
+          <span class="step-label">Introduction</span>
+        </div>
+        <div class="step" id="step-2">
+          2
+          <span class="step-label">Domain Setup</span>
+        </div>
+        <div class="step" id="step-3">
+          3
+          <span class="step-label">Connecting</span>
+        </div>
+        <div class="step" id="step-4">
+          4
+          <span class="step-label">Configuration</span>
+        </div>
+        <div class="step" id="step-5">
+          5
+          <span class="step-label">Verification</span>
+        </div>
+      </div>
+
+      <!-- Wizard Content -->
+      <div class="wizard-content">
+        <!-- Step 1: Introduction -->
+        <div class="wizard-step active" id="step-1-content">
+          <div class="card">
+            <h2 class="text-2xl font-bold mb-4">Welcome to the Domain Connection Wizard</h2>
+            <p class="mb-4">This wizard will guide you through setting up and connecting your five Unstoppable Domains for the 918 Technologies BlockChain BailBonds system.</p>
+            
+            <div class="bg-gray-100 p-4 rounded mb-6">
+              <h3 class="font-medium mb-2">Your Unstoppable Domains:</h3>
+              <ul class="space-y-2">
+                <li class="flex items-center gap-2">
+                  <i class="fas fa-cube text-primary"></i>
+                  <span>Nine1Eight.blockchain</span>
+                  <span class="ml-2 text-xs text-muted">(Primary Domain - Contract Engine)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i class="fas fa-coins text-accent"></i>
+                  <span>Nine1Eight.crypto</span>
+                  <span class="ml-2 text-xs text-muted">(Payment Processing)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i class="fas fa-image text-purple-500"></i>
+                  <span>Nine1Eight.nft</span>
+                  <span class="ml-2 text-xs text-muted">(Contract Verification)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i class="fas fa-wallet text-green-500"></i>
+                  <span>Nine1Eight.wallet</span>
+                  <span class="ml-2 text-xs text-muted">(Wallet Integration)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i class="fas fa-handshake text-red-500"></i>
+                  <span>Nine1Eight.x</span>
+                  <span class="ml-2 text-xs text-muted">(Bondsman Network)</span>
+                </li>
+              </ul>
+            </div>
+            
+            <h3 class="font-medium mb-2">What This Wizard Will Help You Do:</h3>
+            <ol class="space-y-2 mb-6 ml-5" style="list-style-type: decimal;">
+              <li>Set up your Unstoppable Domains with the correct content records</li>
+              <li>Connect the domains to create a unified bail bonds system</li>
+              <li>Configure cross-domain communication and authentication</li>
+              <li>Verify all connections are working properly</li>
+              <li>Test the system with a simulated bail bond scenario</li>
+            </ol>
+            
+            <div class="bg-destructive/10 text-destructive p-4 rounded mb-6">
+              <h4 class="font-medium mb-1">Requirements:</h4>
+              <ul class="space-y-1 ml-5" style="list-style-type: disc;">
+                <li>You must own all five Unstoppable Domains</li>
+                <li>You need access to manage your domain settings</li>
+                <li>A Web3 wallet (MetaMask, Trust Wallet, etc.) is required</li>
+                <li>Basic understanding of blockchain technology</li>
+              </ul>
+            </div>
+            
+            <p class="text-sm text-muted mb-2">Ready to get started? Click "Next" to begin setting up your domains.</p>
+          </div>
+        </div>
+
+        <!-- Step 2: Domain Setup -->
+        <div class="wizard-step hidden" id="step-2-content">
+          <div class="card">
+            <h2 class="text-2xl font-bold mb-4">Domain Setup</h2>
+            <p class="mb-4">We need to verify you have access to all five domains and set them up with the correct configuration.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <!-- Domain Verification Panel -->
+              <div>
+                <h3 class="font-medium mb-3">Domain Verification</h3>
+                <p class="text-sm mb-4">Verify domain ownership by connecting your wallet that controls the domains.</p>
+                
+                <button id="connect-wallet-btn" class="btn btn-primary mb-4">
+                  <i class="fas fa-wallet mr-2"></i>Connect Wallet
+                </button>
+                
+                <div id="wallet-status" class="hidden bg-gray-100 p-3 rounded text-sm">
+                  <p class="font-medium mb-1">Wallet Status:</p>
+                  <p class="wallet-address">Not connected</p>
+                </div>
+                
+                <div id="domain-ownership" class="mt-4 hidden">
+                  <h4 class="font-medium mb-2">Domain Ownership Check:</h4>
+                  <ul class="space-y-2 text-sm">
+                    <li class="flex items-center gap-2">
+                      <i class="fas fa-circle-notch fa-spin text-primary"></i>
+                      <span>Checking Nine1Eight.blockchain...</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <i class="fas fa-circle-notch fa-spin text-primary"></i>
+                      <span>Checking Nine1Eight.crypto...</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <i class="fas fa-circle-notch fa-spin text-primary"></i>
+                      <span>Checking Nine1Eight.nft...</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <i class="fas fa-circle-notch fa-spin text-primary"></i>
+                      <span>Checking Nine1Eight.wallet...</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <i class="fas fa-circle-notch fa-spin text-primary"></i>
+                      <span>Checking Nine1Eight.x...</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              
+              <!-- Domain Configuration Panel -->
+              <div>
+                <h3 class="font-medium mb-3">Domain Configuration</h3>
+                <p class="text-sm mb-4">We'll set up the necessary IPFS and content records for each domain.</p>
+                
+                <button id="setup-domains-btn" class="btn btn-primary mb-4" disabled>
+                  <i class="fas fa-cog mr-2"></i>Setup Domain Records
+                </button>
+                
+                <div id="setup-progress" class="hidden text-sm">
+                  <div class="bg-gray-100 rounded p-3 mb-3">
+                    <p class="font-medium">Configuration Progress:</p>
+                    <div class="w-full bg-muted rounded-full h-2.5 mt-2 mb-1">
+                      <div class="bg-primary h-2.5 rounded-full" style="width: 0%" id="setup-progress-bar"></div>
+                    </div>
+                    <p class="text-xs text-right" id="setup-progress-text">0% Complete</p>
+                  </div>
+                  
+                  <ul class="space-y-2" id="setup-steps">
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Setting up IPFS content for Nine1Eight.blockchain</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Setting up IPFS content for Nine1Eight.crypto</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Setting up IPFS content for Nine1Eight.nft</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Setting up IPFS content for Nine1Eight.wallet</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Setting up IPFS content for Nine1Eight.x</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Creating cross-domain content records</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <i class="fas fa-circle text-muted mt-1"></i>
+                      <span>Verifying configurations</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            <div class="console-output hidden" id="setup-console">
+              <div class="console-line console-info">> Domain setup wizard initialized</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Connecting Domains -->
+        <div class="wizard-step hidden" id="step-3-content">
+          <div class="card">
+            <h2 class="text-2xl font-bold mb-4">Connecting Domains</h2>
+            <p class="mb-6">Now we'll establish the connection between all five domains to create a unified system.</p>
+            
+            <div class="mb-8">
+              <div class="grid grid-cols-1 mb-4">
+                <!-- Primary Domain -->
+                <div class="domain-card mx-auto" id="blockchain-domain-card" style="max-width: 300px;">
+                  <div class="domain-icon blockchain-color">
+                    <i class="fas fa-cube"></i>
+                  </div>
+                  <h3 class="font-bold">Nine1Eight.blockchain</h3>
+                  <p class="text-sm text-muted mb-2">Primary Hub & Contract Engine</p>
+                  <div class="domain-status status-disconnected" id="blockchain-status">Disconnected</div>
+                </div>
+                
+                <!-- Connection Line -->
+                <div class="domain-connection-line relative mx-auto">
+                  <div class="connection-dot" style="left: 50%; transform: translateX(-50%);"></div>
+                </div>
+              </div>
+              
+              <!-- Secondary Domains -->
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="domain-card" id="crypto-domain-card">
+                  <div class="domain-icon crypto-color">
+                    <i class="fas fa-coins"></i>
+                  </div>
+                  <h3 class="font-bold">Nine1Eight.crypto</h3>
+                  <p class="text-sm text-muted mb-2">Payment Processing</p>
+                  <div class="domain-status status-disconnected" id="crypto-status">Disconnected</div>
+                </div>
+                
+                <div class="domain-card" id="nft-domain-card">
+                  <div class="domain-icon nft-color">
+                    <i class="fas fa-image"></i>
+                  </div>
+                  <h3 class="font-bold">Nine1Eight.nft</h3>
+                  <p class="text-sm text-muted mb-2">Contract Verification</p>
+                  <div class="domain-status status-disconnected" id="nft-status">Disconnected</div>
+                </div>
+                
+                <div class="domain-card" id="wallet-domain-card">
+                  <div class="domain-icon wallet-color">
+                    <i class="fas fa-wallet"></i>
+                  </div>
+                  <h3 class="font-bold">Nine1Eight.wallet</h3>
+                  <p class="text-sm text-muted mb-2">Wallet Integration</p>
+                  <div class="domain-status status-disconnected" id="wallet-status">Disconnected</div>
+                </div>
+                
+                <div class="domain-card" id="x-domain-card">
+                  <div class="domain-icon x-color">
+                    <i class="fas fa-handshake"></i>
+                  </div>
+                  <h3 class="font-bold">Nine1Eight.x</h3>
+                  <p class="text-sm text-muted mb-2">Bondsman Network</p>
+                  <div class="domain-status status-disconnected" id="x-status">Disconnected</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex justify-center mb-6">
+              <button id="start-connection-btn" class="btn btn-primary">
+                <i class="fas fa-network-wired mr-2"></i>Start Connection Process
+              </button>
+            </div>
+            
+            <div class="console-output" id="connection-console">
+              <div class="console-line console-info">> Connection wizard initialized</div>
+              <div class="console-line console-info">> Ready to establish connections between domains</div>
+              <div class="console-line console-info">> Click "Start Connection Process" to begin</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Configuration -->
+        <div class="wizard-step hidden" id="step-4-content">
+          <div class="card">
+            <h2 class="text-2xl font-bold mb-4">Domain Configuration</h2>
+            <p class="mb-6">Now let's configure how your domains will interact with each other.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 class="font-medium mb-3">Primary Domain Configuration</h3>
+                <div class="bg-gray-100 p-4 rounded mb-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <div class="domain-icon blockchain-color" style="width: 40px; height: 40px; font-size: 1rem;">
+                      <i class="fas fa-cube"></i>
+                    </div>
+                    <h4 class="font-medium">Nine1Eight.blockchain</h4>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="block text-sm font-medium mb-1">Primary Domain URL</label>
+                    <input type="text" value="https://Nine1Eight.blockchain" class="w-full p-2 text-sm rounded border" readonly />
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="block text-sm font-medium mb-1">Content Type</label>
+                    <select class="w-full p-2 text-sm rounded border">
+                      <option selected>IPFS Website</option>
+                      <option>DNS Redirect</option>
+                      <option>HTML Content</option>
+                    </select>
+                  </div>
+                  
+                  <div class="text-sm mb-2">
+                    <label class="flex items-center">
+                      <input type="checkbox" checked class="mr-2" />
+                      Set as central hub for cross-domain communication
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="font-medium mb-3">Cross-Domain Communication</h3>
+                <div class="bg-gray-100 p-4 rounded">
+                  <div class="mb-3">
+                    <label class="block text-sm font-medium mb-1">Communication Protocol</label>
+                    <select class="w-full p-2 text-sm rounded border">
+                      <option selected>Web3 Messaging</option>
+                      <option>WebRTC</option>
+                      <option>Cross-Origin Messaging</option>
+                    </select>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="block text-sm font-medium mb-1">Encryption Level</label>
+                    <select class="w-full p-2 text-sm rounded border">
+                      <option>None</option>
+                      <option selected>Standard</option>
+                      <option>High</option>
+                    </select>
+                  </div>
+                  
+                  <div class="text-sm mb-2">
+                    <label class="flex items-center">
+                      <input type="checkbox" checked class="mr-2" />
+                      Enable automatic reconnection between domains
+                    </label>
+                  </div>
+                  
+                  <div class="text-sm">
+                    <label class="flex items-center">
+                      <input type="checkbox" checked class="mr-2" />
+                      Allow user data sharing between domains
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <h3 class="font-medium mb-3">Domain-Specific Configuration</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <!-- Crypto Domain Config -->
+              <div class="bg-gray-100 p-3 rounded">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="domain-icon crypto-color" style="width: 30px; height: 30px; font-size: 0.8rem; padding: 0.5rem;">
+                    <i class="fas fa-coins"></i>
+                  </div>
+                  <h4 class="font-medium text-sm">Nine1Eight.crypto</h4>
+                </div>
+                
+                <div class="mb-2">
+                  <label class="block text-xs font-medium mb-1">Supported Payment Tokens</label>
+                  <select class="w-full p-1 text-xs rounded border">
+                    <option selected>USDC, ETH, MATIC</option>
+                    <option>ETH Only</option>
+                    <option>All ERC-20 Tokens</option>
+                  </select>
+                </div>
+                
+                <div class="text-xs">
+                  <label class="flex items-center">
+                    <input type="checkbox" checked class="mr-1" />
+                    Enable automatic escrow contract deployment
+                  </label>
+                </div>
+              </div>
+              
+              <!-- NFT Domain Config -->
+              <div class="bg-gray-100 p-3 rounded">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="domain-icon nft-color" style="width: 30px; height: 30px; font-size: 0.8rem; padding: 0.5rem;">
+                    <i class="fas fa-image"></i>
+                  </div>
+                  <h4 class="font-medium text-sm">Nine1Eight.nft</h4>
+                </div>
+                
+                <div class="mb-2">
+                  <label class="block text-xs font-medium mb-1">NFT Standard</label>
+                  <select class="w-full p-1 text-xs rounded border">
+                    <option selected>ERC-721</option>
+                    <option>ERC-1155</option>
+                  </select>
+                </div>
+                
+                <div class="text-xs">
+                  <label class="flex items-center">
+                    <input type="checkbox" checked class="mr-1" />
+                    Generate NFT for each contract automatically
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Wallet Domain Config -->
+              <div class="bg-gray-100 p-3 rounded">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="domain-icon wallet-color" style="width: 30px; height: 30px; font-size: 0.8rem; padding: 0.5rem;">
+                    <i class="fas fa-wallet"></i>
+                  </div>
+                  <h4 class="font-medium text-sm">Nine1Eight.wallet</h4>
+                </div>
+                
+                <div class="mb-2">
+                  <label class="block text-xs font-medium mb-1">Supported Wallet Providers</label>
+                  <select class="w-full p-1 text-xs rounded border">
+                    <option selected>MetaMask, Trust Wallet, Coinbase</option>
+                    <option>MetaMask Only</option>
+                    <option>All Web3 Wallets</option>
+                  </select>
+                </div>
+                
+                <div class="text-xs">
+                  <label class="flex items-center">
+                    <input type="checkbox" checked class="mr-1" />
+                    Enable proxy signature system for emergency access
+                  </label>
+                </div>
+              </div>
+              
+              <!-- X Domain Config -->
+              <div class="bg-gray-100 p-3 rounded">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="domain-icon x-color" style="width: 30px; height: 30px; font-size: 0.8rem; padding: 0.5rem;">
+                    <i class="fas fa-handshake"></i>
+                  </div>
+                  <h4 class="font-medium text-sm">Nine1Eight.x</h4>
+                </div>
+                
+                <div class="mb-2">
+                  <label class="block text-xs font-medium mb-1">Bondsman Matching Algorithm</label>
+                  <select class="w-full p-1 text-xs rounded border">
+                    <option selected>Proximity + Tier Priority</option>
+                    <option>Response Time</option>
+                    <option>Rating Based</option>
+                  </select>
+                </div>
+                
+                <div class="text-xs">
+                  <label class="flex items-center">
+                    <input type="checkbox" checked class="mr-1" />
+                    Send automatic notifications to bondsmen
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex justify-center">
+              <button id="save-config-btn" class="btn btn-primary">
+                <i class="fas fa-save mr-2"></i>Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: Verification -->
+        <div class="wizard-step hidden" id="step-5-content">
+          <div class="card">
+            <h2 class="text-2xl font-bold mb-4">System Verification</h2>
+            <p class="mb-6">Let's verify that all your domains are properly connected and the system is working as expected.</p>
+            
+            <div class="bg-gray-100 p-4 rounded mb-6">
+              <h3 class="font-medium mb-3">Domain Connection Status</h3>
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-center">
+                <div>
+                  <div class="domain-icon blockchain-color mx-auto" style="width: 50px; height: 50px; font-size: 1.25rem;">
+                    <i class="fas fa-cube"></i>
+                  </div>
+                  <h4 class="text-sm font-medium mb-1">Nine1Eight.blockchain</h4>
+                  <span class="domain-status status-connected text-xs">Connected</span>
+                </div>
+                
+                <div>
+                  <div class="domain-icon crypto-color mx-auto" style="width: 50px; height: 50px; font-size: 1.25rem;">
+                    <i class="fas fa-coins"></i>
+                  </div>
+                  <h4 class="text-sm font-medium mb-1">Nine1Eight.crypto</h4>
+                  <span class="domain-status status-connected text-xs">Connected</span>
+                </div>
+                
+                <div>
+                  <div class="domain-icon nft-color mx-auto" style="width: 50px; height: 50px; font-size: 1.25rem;">
+                    <i class="fas fa-image"></i>
+                  </div>
+                  <h4 class="text-sm font-medium mb-1">Nine1Eight.nft</h4>
+                  <span class="domain-status status-connected text-xs">Connected</span>
+                </div>
+                
+                <div>
+                  <div class="domain-icon wallet-color mx-auto" style="width: 50px; height: 50px; font-size: 1.25rem;">
+                    <i class="fas fa-wallet"></i>
+                  </div>
+                  <h4 class="text-sm font-medium mb-1">Nine1Eight.wallet</h4>
+                  <span class="domain-status status-connected text-xs">Connected</span>
+                </div>
+                
+                <div>
+                  <div class="domain-icon x-color mx-auto" style="width: 50px; height: 50px; font-size: 1.25rem;">
+                    <i class="fas fa-handshake"></i>
+                  </div>
+                  <h4 class="text-sm font-medium mb-1">Nine1Eight.x</h4>
+                  <span class="domain-status status-connected text-xs">Connected</span>
+                </div>
+              </div>
+            </div>
+            
+            <h3 class="font-medium mb-3">System Test</h3>
+            <p class="text-sm mb-4">Let's run a test to simulate the bail bond process across all domains:</p>
+            
+            <div class="flex justify-center mb-6">
+              <button id="run-test-btn" class="btn btn-primary">
+                <i class="fas fa-vial mr-2"></i>Run System Test
+              </button>
+            </div>
+            
+            <div class="console-output" id="verification-console">
+              <div class="console-line console-info">> Verification system initialized</div>
+              <div class="console-line console-info">> All domains connected successfully</div>
+              <div class="console-line console-info">> Click "Run System Test" to verify the complete system</div>
+            </div>
+            
+            <div class="hidden mt-6" id="verification-success">
+              <div class="p-4 rounded bg-success/10 border border-success text-center">
+                <div class="text-4xl text-success mb-3">
+                  <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2">System Verification Complete!</h3>
+                <p class="mb-4">Your 918 Technologies BlockChain BailBonds system is now fully set up and ready to use.</p>
+                <a href="index.html" class="btn btn-success">Go to Main Application</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wizard Navigation -->
+      <div class="wizard-navigation">
+        <button id="prev-btn" class="btn btn-outline" disabled>
+          <i class="fas fa-arrow-left mr-2"></i>Previous
+        </button>
+        <button id="next-btn" class="btn btn-primary">
+          Next<i class="fas fa-arrow-right ml-2"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 mt-8 border-t text-sm text-muted bg-white">
+    <div class="container">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          &copy; <span id="current-year"></span> 918 Technologies Inc. All rights reserved.
+        </div>
+        <div class="flex gap-4">
+          <a href="#" class="text-primary">Terms</a>
+          <a href="#" class="text-primary">Privacy</a>
+          <a href="#" class="text-primary">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    // Set current year in footer
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // DOM Elements
+    const steps = document.querySelectorAll('.step');
+    const wizardSteps = document.querySelectorAll('.wizard-step');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    
+    // Step 2 Elements
+    const connectWalletBtn = document.getElementById('connect-wallet-btn');
+    const walletStatus = document.getElementById('wallet-status');
+    const domainOwnership = document.getElementById('domain-ownership');
+    const setupDomainsBtn = document.getElementById('setup-domains-btn');
+    const setupProgress = document.getElementById('setup-progress');
+    const setupProgressBar = document.getElementById('setup-progress-bar');
+    const setupProgressText = document.getElementById('setup-progress-text');
+    const setupSteps = document.getElementById('setup-steps');
+    const setupConsole = document.getElementById('setup-console');
+    
+    // Step 3 Elements
+    const startConnectionBtn = document.getElementById('start-connection-btn');
+    const connectionConsole = document.getElementById('connection-console');
+    const domainCards = {
+      blockchain: document.getElementById('blockchain-domain-card'),
+      crypto: document.getElementById('crypto-domain-card'),
+      nft: document.getElementById('nft-domain-card'),
+      wallet: document.getElementById('wallet-domain-card'),
+      x: document.getElementById('x-domain-card')
+    };
+    const domainStatuses = {
+      blockchain: document.getElementById('blockchain-status'),
+      crypto: document.getElementById('crypto-status'),
+      nft: document.getElementById('nft-status'),
+      wallet: document.getElementById('wallet-status'),
+      x: document.getElementById('x-status')
+    };
+    
+    // Step 4 Elements
+    const saveConfigBtn = document.getElementById('save-config-btn');
+    
+    // Step 5 Elements
+    const runTestBtn = document.getElementById('run-test-btn');
+    const verificationConsole = document.getElementById('verification-console');
+    const verificationSuccess = document.getElementById('verification-success');
+    
+    // Current step tracking
+    let currentStep = 1;
+    
+    // Show toast notification
+    function showToast(title, message, variant = "default") {
+      const toastContainer = document.getElementById('toast-container');
+      
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      if (variant === "destructive") {
+        toast.style.borderLeft = "4px solid var(--destructive)";
+      } else if (variant === "success") {
+        toast.style.borderLeft = "4px solid var(--success)";
+      } else {
+        toast.style.borderLeft = "4px solid var(--primary)";
+      }
+      
+      toast.innerHTML = `
+        <div class="font-semibold">${title}</div>
+        <div class="text-sm text-muted">${message}</div>
+      `;
+      
+      toastContainer.appendChild(toast);
+      
+      // Remove toast after 3 seconds
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+    
+    // Add log to console output
+    function addConsoleLog(message, type = 'info', consoleElement) {
+      const logLine = document.createElement('div');
+      logLine.className = `console-line console-${type}`;
+      logLine.textContent = `> ${message}`;
+      
+      consoleElement.appendChild(logLine);
+      consoleElement.scrollTop = consoleElement.scrollHeight;
+    }
+    
+    // Show step
+    function showStep(stepNumber) {
+      // Hide all steps
+      wizardSteps.forEach(step => {
+        step.classList.add('hidden');
+      });
+      
+      // Remove active class from all step indicators
+      steps.forEach(step => {
+        step.classList.remove('active');
+        step.classList.remove('completed');
+      });
+      
+      // Show current step
+      document.getElementById(`step-${stepNumber}-content`).classList.remove('hidden');
+      
+      // Update step indicators
+      for (let i = 1; i <= steps.length; i++) {
+        const stepIndicator = document.getElementById(`step-${i}`);
+        if (i < stepNumber) {
+          stepIndicator.classList.add('completed');
+        } else if (i === stepNumber) {
+          stepIndicator.classList.add('active');
+        }
+      }
+      
+      // Update buttons
+      prevBtn.disabled = stepNumber === 1;
+      nextBtn.innerHTML = stepNumber === 5 ? 'Finish<i class="fas fa-check ml-2"></i>' : 'Next<i class="fas fa-arrow-right ml-2"></i>';
+      
+      currentStep = stepNumber;
+    }
+    
+    // Next step
+    function nextStep() {
+      if (currentStep < 5) {
+        showStep(currentStep + 1);
+      } else {
+        // Finish wizard
+        showToast('Wizard Complete', 'Your domains are now fully configured and connected!', 'success');
+        window.location.href = 'index.html';
+      }
+    }
+    
+    // Previous step
+    function prevStep() {
+      if (currentStep > 1) {
+        showStep(currentStep - 1);
+      }
+    }
+    
+    // Connect wallet simulation
+    function simulateWalletConnection() {
+      connectWalletBtn.disabled = true;
+      connectWalletBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Connecting...';
+      
+      setTimeout(() => {
+        walletStatus.classList.remove('hidden');
+        const walletAddress = document.querySelector('.wallet-address');
+        walletAddress.textContent = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';
+        
+        connectWalletBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Wallet Connected';
+        connectWalletBtn.classList.remove('btn-primary');
+        connectWalletBtn.classList.add('btn-success');
+        
+        // Show domain ownership check
+        domainOwnership.classList.remove('hidden');
+        
+        addConsoleLog('Wallet connected successfully', 'success', setupConsole);
+        addConsoleLog('Starting domain ownership verification', 'info', setupConsole);
+        
+        setupConsole.classList.remove('hidden');
+        
+        // Simulate checking domain ownership
+        simulateDomainOwnershipCheck();
+      }, 2000);
+    }
+    
+    // Domain ownership check simulation
+    function simulateDomainOwnershipCheck() {
+      const domainItems = domainOwnership.querySelectorAll('li');
+      
+      // Check domains one by one
+      let checkIndex = 0;
+      const checkInterval = setInterval(() => {
+        if (checkIndex < domainItems.length) {
+          const item = domainItems[checkIndex];
+          item.innerHTML = `<i class="fas fa-check-circle text-success"></i> <span>Verified Nine1Eight.${getDomainName(checkIndex)}</span>`;
+          
+          addConsoleLog(`Domain Nine1Eight.${getDomainName(checkIndex)} ownership verified`, 'success', setupConsole);
+          
+          checkIndex++;
+        } else {
+          clearInterval(checkInterval);
+          setupDomainsBtn.disabled = false;
+          
+          addConsoleLog('All domains verified successfully', 'success', setupConsole);
+          addConsoleLog('Ready to set up domain records', 'info', setupConsole);
+          
+          showToast('Verification Complete', 'All domains verified successfully!', 'success');
+        }
+      }, 1000);
+      
+      function getDomainName(index) {
+        const domains = ['blockchain', 'crypto', 'nft', 'wallet', 'x'];
+        return domains[index];
+      }
+    }
+    
+    // Setup domains simulation
+    function simulateDomainSetup() {
+      setupDomainsBtn.disabled = true;
+      setupDomainsBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Setting Up...';
+      setupProgress.classList.remove('hidden');
+      
+      addConsoleLog('Starting domain setup process', 'info', setupConsole);
+      
+      const setupItems = setupSteps.querySelectorAll('li');
+      let setupIndex = 0;
+      let progress = 0;
+      
+      const setupInterval = setInterval(() => {
+        if (setupIndex < setupItems.length) {
+          const item = setupItems[setupIndex];
+          item.querySelector('i').className = 'fas fa-check-circle text-success mt-1';
+          
+          const taskName = item.querySelector('span').textContent;
+          addConsoleLog(`${taskName}: Complete`, 'success', setupConsole);
+          
+          setupIndex++;
+          progress = Math.round((setupIndex / setupItems.length) * 100);
+          
+          setupProgressBar.style.width = `${progress}%`;
+          setupProgressText.textContent = `${progress}% Complete`;
+        } else {
+          clearInterval(setupInterval);
+          setupDomainsBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Setup Complete';
+          setupDomainsBtn.classList.remove('btn-primary');
+          setupDomainsBtn.classList.add('btn-success');
+          
+          addConsoleLog('Domain setup completed successfully', 'success', setupConsole);
+          addConsoleLog('All IPFS content and records configured', 'info', setupConsole);
+          addConsoleLog('Ready to establish connections between domains', 'info', setupConsole);
+          
+          showToast('Setup Complete', 'All domains have been configured successfully!', 'success');
+          
+          // Enable next button
+          nextBtn.disabled = false;
+        }
+      }, 1200);
+    }
+    
+    // Domain connection simulation
+    function simulateDomainConnection() {
+      startConnectionBtn.disabled = true;
+      startConnectionBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Connecting...';
+      
+      addConsoleLog('Initiating cross-domain connection process', 'info', connectionConsole);
+      
+      // First connect primary domain
+      setTimeout(() => {
+        domainCards.blockchain.classList.add('connected');
+        domainStatuses.blockchain.textContent = 'Connected';
+        domainStatuses.blockchain.classList.remove('status-disconnected');
+        domainStatuses.blockchain.classList.add('status-connected');
+        
+        addConsoleLog('Primary domain Nine1Eight.blockchain activated', 'success', connectionConsole);
+        addConsoleLog('Establishing connections to secondary domains...', 'info', connectionConsole);
+        
+        // Add animation to connection lines
+        document.querySelector('.domain-connection-line').classList.add('connection-animating');
+        
+        // Connect secondary domains one by one
+        const domains = ['crypto', 'nft', 'wallet', 'x'];
+        let domainIndex = 0;
+        
+        const connectInterval = setInterval(() => {
+          if (domainIndex < domains.length) {
+            const domain = domains[domainIndex];
+            
+            domainCards[domain].classList.add('connected');
+            domainStatuses[domain].textContent = 'Connected';
+            domainStatuses[domain].classList.remove('status-disconnected');
+            domainStatuses[domain].classList.add('status-connected');
+            
+            addConsoleLog(`Connected Nine1Eight.${domain} to primary domain`, 'success', connectionConsole);
+            
+            domainIndex++;
+          } else {
+            clearInterval(connectInterval);
+            document.querySelector('.domain-connection-line').classList.remove('connection-animating');
+            
+            startConnectionBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>All Domains Connected';
+            startConnectionBtn.classList.remove('btn-primary');
+            startConnectionBtn.classList.add('btn-success');
+            
+            addConsoleLog('All domain connections established successfully', 'success', connectionConsole);
+            addConsoleLog('Cross-domain communication channels opened', 'info', connectionConsole);
+            addConsoleLog('Ready for domain configuration', 'info', connectionConsole);
+            
+            showToast('Connection Complete', 'All domains have been connected successfully!', 'success');
+            
+            // Enable next button
+            nextBtn.disabled = false;
+          }
+        }, 1500);
+      }, 2000);
+    }
+    
+    // Save configuration simulation
+    function simulateSaveConfiguration() {
+      saveConfigBtn.disabled = true;
+      saveConfigBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Saving...';
+      
+      setTimeout(() => {
+        saveConfigBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Configuration Saved';
+        saveConfigBtn.classList.remove('btn-primary');
+        saveConfigBtn.classList.add('btn-success');
+        
+        showToast('Configuration Saved', 'Your domain configuration has been saved successfully!', 'success');
+        
+        // Enable next button
+        nextBtn.disabled = false;
+      }, 2000);
+    }
+    
+    // System test simulation
+    function simulateSystemTest() {
+      runTestBtn.disabled = true;
+      runTestBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Testing...';
+      
+      addConsoleLog('Initiating system-wide test', 'info', verificationConsole);
+      addConsoleLog('Testing cross-domain communication...', 'info', verificationConsole);
+      
+      setTimeout(() => {
+        addConsoleLog('Cross-domain communication verified', 'success', verificationConsole);
+        addConsoleLog('Testing emergency activation flow...', 'info', verificationConsole);
+      }, 1000);
+      
+      setTimeout(() => {
+        addConsoleLog('Emergency activation flow verified', 'success', verificationConsole);
+        addConsoleLog('Testing wallet connection and authorization...', 'info', verificationConsole);
+      }, 2000);
+      
+      setTimeout(() => {
+        addConsoleLog('Wallet connection and authorization verified', 'success', verificationConsole);
+        addConsoleLog('Testing contract generation and verification...', 'info', verificationConsole);
+      }, 3000);
+      
+      setTimeout(() => {
+        addConsoleLog('Contract generation and verification successful', 'success', verificationConsole);
+        addConsoleLog('Testing payment processing and escrow...', 'info', verificationConsole);
+      }, 4000);
+      
+      setTimeout(() => {
+        addConsoleLog('Payment processing and escrow verified', 'success', verificationConsole);
+        addConsoleLog('Testing bondsman notification system...', 'info', verificationConsole);
+      }, 5000);
+      
+      setTimeout(() => {
+        addConsoleLog('Bondsman notification system verified', 'success', verificationConsole);
+        addConsoleLog('All systems functioning correctly', 'success', verificationConsole);
+        
+        runTestBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Test Complete';
+        runTestBtn.classList.remove('btn-primary');
+        runTestBtn.classList.add('btn-success');
+        
+        verificationSuccess.classList.remove('hidden');
+        
+        showToast('Test Complete', 'System verification completed successfully!', 'success');
+        
+        // Enable next button
+        nextBtn.disabled = false;
+      }, 6000);
+    }
+    
+    // Event Listeners
+    prevBtn.addEventListener('click', prevStep);
+    nextBtn.addEventListener('click', () => {
+      if (currentStep === 1) {
+        nextStep();
+      } else if (currentStep === 2) {
+        nextBtn.disabled = true;
+        nextStep();
+      } else if (currentStep === 3) {
+        nextBtn.disabled = true;
+        nextStep();
+      } else if (currentStep === 4) {
+        nextBtn.disabled = true;
+        nextStep();
+      } else {
+        nextStep();
+      }
+    });
+    
+    // Step specific button handlers
+    connectWalletBtn.addEventListener('click', simulateWalletConnection);
+    setupDomainsBtn.addEventListener('click', simulateDomainSetup);
+    startConnectionBtn.addEventListener('click', simulateDomainConnection);
+    saveConfigBtn.addEventListener('click', simulateSaveConfiguration);
+    runTestBtn.addEventListener('click', simulateSystemTest);
+    
+    // Initialize the wizard
+    document.addEventListener('DOMContentLoaded', () => {
+      showStep(1);
+      
+      // Show welcome toast
+      setTimeout(() => {
+        showToast('Welcome to the Wizard', 'This wizard will guide you through setting up your domain network.');
+      }, 500);
+    });
+  </script>
+</body>
+</html>
