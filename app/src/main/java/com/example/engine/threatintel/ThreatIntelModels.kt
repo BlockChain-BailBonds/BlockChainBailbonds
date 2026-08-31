@@ -20,7 +20,10 @@ data class ProviderEnvelope<T>(
     val cacheAgeSeconds: Long? = null,
     val retryAfterSeconds: Long? = null,
     val errorClass: String? = null
-)
+) {
+    val authoritativeNegativeAllowed: Boolean
+        get() = health == ProviderHealth.FRESH || health == ProviderHealth.STALE
+}
 
 data class ThreatIntelRecord(
     val id: String,
@@ -42,9 +45,20 @@ data class ThreatIntelRecord(
     val sources: Set<String> = emptySet(),
     val disagreements: Set<String> = emptySet()
 ) {
-    val knownExploited: Boolean get() = knownExploitedObservations.any { it.value }
-    val zeroDay: Boolean get() = zeroDayObservations.any { it.value }
-    val activeCampaign: Boolean get() = activeCampaignObservations.any { it.value }
+    val knownExploited: Boolean?
+        get() = triState(knownExploitedObservations)
+
+    val zeroDay: Boolean?
+        get() = triState(zeroDayObservations)
+
+    val activeCampaign: Boolean?
+        get() = triState(activeCampaignObservations)
+
+    private fun triState(observations: List<SourceObservation<Boolean>>): Boolean? {
+        if (observations.isEmpty()) return null
+        if (observations.any { it.value }) return true
+        return false
+    }
 }
 
 data class TechnologyFingerprint(
