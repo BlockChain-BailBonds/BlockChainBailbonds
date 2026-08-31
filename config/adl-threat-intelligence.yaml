@@ -1,0 +1,85 @@
+version: 1
+agent: ateia
+mode: passive_external_exposure
+
+scope:
+  require_authorized_asset: true
+  deny_out_of_scope_redirects: true
+  max_queries_per_lease: 25
+  lease_ttl_seconds: 900
+
+search:
+  allowed_operators: [site, filetype, ext, intitle, inurl, intext, before, after]
+  metadata_only: true
+  max_results_per_query: 100
+
+threat_intelligence:
+  providers:
+    cisa_kev: {enabled: true, ttl_seconds: 1800, stale_if_error_seconds: 86400}
+    nvd: {enabled: true, ttl_seconds: 1800, stale_if_error_seconds: 86400}
+    first_epss: {enabled: true, refresh_mode: daily_bulk, ttl_seconds: 86400}
+    github_advisories: {enabled: true, ttl_seconds: 1800, stale_if_error_seconds: 21600}
+    campaign_intel: {enabled: true, ttl_seconds: 600, stale_if_error_seconds: 3600}
+  transport:
+    honor_retry_after: true
+    exponential_backoff: true
+    jitter: true
+    circuit_breaker: true
+    max_concurrency_per_provider: 4
+  failure_semantics:
+    empty_is_not_negative_when_degraded: true
+    propagate_provider_health: true
+    stale_confidence_penalty: 0.20
+
+correlation:
+  batch_before_provider_lookup: true
+  match_order: [cve, cpe, purl, vendor_product_version, bounded_alias]
+  fuzzy_match_can_create_critical: false
+  unknown_version_state: POTENTIALLY_AFFECTED
+  campaign_half_life_days: 30
+  preserve_source_observations: true
+  surface_disagreements: true
+
+risk:
+  model: weighted_log_odds_sigmoid
+  ranking_key: latent_score
+  weights:
+    exposure: 1.20
+    asset: 1.10
+    severity: 1.00
+    epss: 1.15
+    kev: 1.60
+    campaign: 1.25
+    zero_day: 1.20
+    freshness: 0.50
+    uncertainty: -1.00
+
+actions:
+  passive_enrichment: allow
+  defensive_alerting: allow
+  ticket_generation: allow
+  additional_passive_search: lease_required
+  authentication: deny
+  credential_submission: deny
+  access_control_bypass: deny
+  exploit_execution: deny
+  persistence: deny
+  destructive_testing: deny
+  private_data_retrieval: deny
+
+ghostbridge:
+  enabled: true
+  telemetry:
+    - lease_id
+    - asset_id
+    - exposure_evidence
+    - fingerprint_evidence
+    - source_observations
+    - provider_health
+    - cache_age
+    - correlation_explanation
+    - disagreements
+    - uncertainty
+    - latent_score
+    - priority
+    - adl_decision
