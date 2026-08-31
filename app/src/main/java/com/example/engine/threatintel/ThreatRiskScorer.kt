@@ -21,29 +21,41 @@ data class RiskEvidence(
     val assetCriticality: Double,
     val cvss: Double?,
     val epss: Double?,
-    val knownExploited: Boolean,
-    val campaignRelevance: Double,
-    val zeroDay: Boolean,
+    val knownExploited: Boolean?,
+    val campaignRelevance: Double?,
+    val zeroDay: Boolean?,
     val freshness: Double,
     val uncertainty: Double
 )
 
-data class RiskScore(val latent: Double, val probability: Double)
+data class RiskScore(
+    val latent: Double,
+    val probability: Double,
+    val contributions: Map<String, Double>
+)
 
 class ThreatRiskScorer(private val w: RiskWeights = RiskWeights()) {
     fun score(e: RiskEvidence): RiskScore {
         val severity = (e.cvss ?: 0.0).coerceIn(0.0, 10.0) / 10.0
-        val z = w.bias +
-            w.exposure * logit(e.exposureConfidence) +
-            w.asset * logit(e.assetCriticality) +
-            w.severity * severity +
-            w.epss * logit(e.epss ?: 0.01) +
-            w.kev * if (e.knownExploited) 1.0 else 0.0 +
-            w.campaign * e.campaignRelevance.coerceIn(0.0, 1.0) +
-            w.zeroDay * if (e.zeroDay) 1.0 else 0.0 +
-            w.freshness * e.freshness.coerceIn(0.0, 1.0) +
-            w.uncertainty * e.uncertainty.coerceIn(0.0, 1.0)
-        return RiskScore(latent = z, probability = sigmoid(z))
+        val contributions = linkedMapOf(
+            "exposure" to w.exposure * logit(e.exposureConfidence),
+            "asset" to w.asset * logit(e.assetCriticality),
+            "severity" to w.severity * severity,
+            "epss" to w.epss * logit(e.epss ?: 0.01),
+            "kev" to w.kev * triStateSignal(e.knownExploited),
+            "campaign" to w.campaign * (e.campaignRelevance?.coerceIn(0.0, 1.0) ?: 0.0),
+            "zeroDay" to w.zeroDay * triStateSignal(e.zeroDay),
+            "freshness" to w.freshness * e.freshness.coerceIn(0.0, 1.0),
+            "uncertainty" to w.uncertainty * e.uncertainty.coerceIn(0.0, 1.0)
+        )
+        val z = w.bias + contributions.values.sum()
+        return RiskScore(latent = z, probability = sigmoid(z), contributions = contributions)
+    }
+
+    private fun triStateSignal(value: Boolean?): Double = when (value) {
+        true -> 1.0
+        false -> 0.0
+        null -> 0.0
     }
 
     private fun sigmoid(x: Double) = 1.0 / (1.0 + exp(-x))
