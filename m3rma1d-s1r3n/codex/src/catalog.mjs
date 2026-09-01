@@ -13,6 +13,7 @@ const DENIED_KEYS = new Set(['raw_command', 'command', 'shell', 'exec', 'code', 
 const DENIED_TEXT = /(raw[_ -]?cli|shell|exec\s*\(|jamm|brute.?force|credential.?dump|access.?bypass)/i;
 const ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+const RISKS = ['observe', 'local_state', 'physical_output', 'transmit', 'restricted'];
 
 function walk(value, visitor, key = '') {
   visitor(value, key);
@@ -76,7 +77,7 @@ export function validateAdapter(adapter) {
   invariant(ID.test(adapter.adapter_id ?? ''), 'invalid adapter_id');
   invariant(ID.test(adapter.app_id ?? ''), 'invalid app_id');
   invariant(ID.test(adapter.function ?? ''), 'invalid function');
-  invariant(['observe', 'local_state', 'physical_output', 'transmit', 'restricted'].includes(adapter.risk), 'invalid adapter risk');
+  invariant(RISKS.includes(adapter.risk), 'invalid adapter risk');
   invariant(Array.isArray(adapter.operations) && adapter.operations.length > 0 && adapter.operations.length <= 128, 'invalid adapter operations');
   invariant(Array.isArray(adapter.test_plan) && adapter.test_plan.length > 0 && adapter.test_plan.length <= 16, 'adapter test plan required');
   adapter.operations.forEach(validateOperation);
@@ -96,6 +97,33 @@ export function validateAdapter(adapter) {
   return adapter;
 }
 
+export function validateScript(script) {
+  invariant(script?.script_version === '1.0', 'unsupported script version');
+  invariant(ID.test(script.script_id ?? ''), 'invalid script_id');
+  requireString(script.description, 'script.description', 512);
+  invariant(RISKS.includes(script.risk), 'invalid script risk');
+  invariant(Array.isArray(script.steps) && script.steps.length > 0 && script.steps.length <= 128, 'invalid script steps');
+  invariant(Array.isArray(script.test_plan) && script.test_plan.length > 0 && script.test_plan.length <= 16, 'script test plan required');
+  const seen = new Set();
+  for (const step of script.steps) {
+    invariant(step && typeof step === 'object' && !Array.isArray(step), 'invalid script step');
+    invariant(ID.test(step.id ?? ''), 'invalid script step id');
+    invariant(!seen.has(step.id), `duplicate script step id: ${step.id}`);
+    seen.add(step.id);
+    invariant(ID.test(step.app_id ?? ''), `invalid script app_id: ${step.id}`);
+    invariant(ID.test(step.function ?? ''), `invalid script function: ${step.id}`);
+    if (step.approval) invariant(['auto', 'deck', 'operator'].includes(step.approval), `invalid script approval: ${step.id}`);
+    if (step.on_error) invariant(['stop', 'continue'].includes(step.on_error), `invalid script on_error: ${step.id}`);
+    if (step.timeout_ms !== undefined) invariant(Number.isInteger(step.timeout_ms) && step.timeout_ms >= 100 && step.timeout_ms <= 120000,
+      `invalid script timeout: ${step.id}`);
+  }
+  walk(script, (value, key) => {
+    invariant(!DENIED_KEYS.has(key), `script field denied: ${key}`);
+    if (typeof value === 'string') invariant(!DENIED_TEXT.test(value), `script text denied at ${key}`);
+  });
+  return script;
+}
+
 function baseAdapter(adapter) {
   const copy = structuredClone(adapter);
   for (const key of ['origin', 'verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at', 'test_evidence_sha256']) {
@@ -108,6 +136,21 @@ function normalizeAdapter(adapter, metadata) {
   const base = validateAdapter(baseAdapter(adapter));
   const digest = sha256(`${stableJson(base)}\n`);
   if (metadata.sha256) invariant(metadata.sha256 === digest, `adapter integrity failure: ${base.adapter_id}`);
+  return {...base, ...metadata, sha256: digest};
+}
+
+function baseScript(script) {
+  const copy = structuredClone(script);
+  for (const key of ['verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at', 'test_evidence_sha256', 'origin']) {
+    delete copy[key];
+  }
+  return copy;
+}
+
+function normalizeScript(script, metadata) {
+  const base = validateScript(baseScript(script));
+  const digest = sha256(`${stableJson(base)}\n`);
+  if (metadata.sha256) invariant(metadata.sha256 === digest, `script integrity failure: ${base.script_id}`);
   return {...base, ...metadata, sha256: digest};
 }
 
@@ -165,7 +208,22 @@ export class CatalogService {
       };
     }
 
-    this.scripts = {...(catalog.scripts ?? {}), ...(generated.scripts ?? {})};
+    this.scripts = {...(catalog.scripts ?? {})};
+    for (const [scriptId, entry] of Object.entries(generated.scripts ?? {})) {
+      const source = entry.script ?? entry;
+      invariant(source.script_id === scriptId, `generated script key mismatch: ${scriptId}`);
+      const normalized = normalizeScript(source, {
+        origin: 'generated',
+        verification_status: entry.verification_status ?? 'staged_pending_review',
+        artifact_id: entry.artifact_id,
+        verified_by: entry.verified_by,
+        verified_at: entry.verified_at,
+        test_evidence_sha256: entry.test_evidence_sha256,
+        sha256: entry.sha256,
+      });
+      this.generated.scripts[scriptId] = normalized;
+      this.scripts[scriptId] = normalized;
+    }
     this.loaded = true;
   }
 
@@ -187,7 +245,11 @@ export class CatalogService {
         origin: adapter.origin,
         verification_status: adapter.verification_status,
       }])),
-      generated_scripts: Object.keys(this.generated.scripts ?? {}),
+      scripts: Object.fromEntries(Object.entries(this.scripts).map(([id, script]) => [id, {
+        sha256: script.sha256 ?? null,
+        origin: script.origin ?? 'bundled',
+        verification_status: script.verification_status ?? 'bundled_verified',
+      }])),
     };
   }
 
@@ -215,17 +277,20 @@ export class CatalogService {
 
   async resolveScript(scriptId) {
     await this.load();
-    const entry = this.scripts[scriptId];
-    if (!entry) return null;
-    const script = entry.script ?? entry;
-    invariant(script.script_version === '1.0' && Array.isArray(script.steps), `invalid script: ${scriptId}`);
+    const script = this.scripts[scriptId];
+    if (!script) return null;
+    validateScript(script);
     return {
       operation: 'script',
-      artifact_id: entry.artifact_id ?? '',
-      risk: entry.risk ?? script.risk,
-      libraries: entry.libraries ?? [],
-      script: structuredClone(script),
-      verification_status: entry.verification_status ?? 'bundled_verified',
+      artifact_id: script.artifact_id ?? '',
+      risk: script.risk,
+      libraries: script.libraries ?? [],
+      script: structuredClone(baseScript(script)),
+      sha256: script.sha256,
+      origin: script.origin ?? 'bundled',
+      verification_status: script.verification_status ?? 'bundled_verified',
+      verified_by: script.verified_by,
+      test_evidence_sha256: script.test_evidence_sha256,
     };
   }
 
@@ -240,6 +305,8 @@ export class CatalogService {
     invariant(staged?.type === 'adapter' && staged.value, 'staged adapter required');
     const adapter = validateAdapter(staged.value);
     invariant(adapter.app_id === appId && adapter.function === functionName, 'generated adapter target mismatch');
+    invariant(adapter.operations.some((operation) => operation.op === 'deck_confirm'),
+      'every generated adapter requires explicit Deck confirmation');
     const normalized = normalizeAdapter(adapter, {
       origin: 'generated',
       verification_status: 'staged_pending_review',
@@ -277,6 +344,9 @@ export class CatalogService {
       test_evidence_sha256: adapter.test_evidence_sha256,
       sha256: adapter.sha256,
     });
+    const functionEntry = this.catalog.apps[adapter.app_id]?.functions?.[adapter.function];
+    if (functionEntry) functionEntry.verification_status = 'operator_verified';
+    this.generated.adapters[adapterId] = this.adapters[adapterId];
     await this.#persistGenerated();
     return structuredClone(this.adapters[adapterId]);
   }
@@ -284,19 +354,43 @@ export class CatalogService {
   async registerGeneratedScript(scriptId, staged) {
     await this.load();
     invariant(staged?.type === 'script' && staged.value, 'staged script required');
-    const script = staged.value;
-    invariant(script.script_version === '1.0' && ID.test(scriptId), 'invalid generated script');
-    this.generated.scripts ??= {};
-    this.generated.scripts[scriptId] = {
+    const script = validateScript(staged.value);
+    invariant(script.script_id === scriptId, 'generated script target mismatch');
+    const normalized = normalizeScript(script, {
+      origin: 'generated',
+      verification_status: 'staged_pending_review',
       artifact_id: staged.artifact_id,
       sha256: staged.sha256,
-      risk: script.risk,
-      libraries: [],
-      verification_status: 'staged_pending_review',
-      script,
-    };
-    this.scripts[scriptId] = this.generated.scripts[scriptId];
+    });
+    this.generated.scripts ??= {};
+    this.generated.scripts[scriptId] = normalized;
+    this.scripts[scriptId] = normalized;
     await this.#persistGenerated();
+  }
+
+  async promoteGeneratedScript({scriptId, operatorId, testEvidenceSha256}) {
+    await this.load();
+    invariant(ID.test(operatorId ?? ''), 'operator ID is required');
+    invariant(SHA256.test(testEvidenceSha256 ?? ''), 'test evidence SHA-256 is required');
+    const script = this.generated.scripts?.[scriptId];
+    invariant(script, `generated script not found: ${scriptId}`);
+    script.verification_status = 'operator_verified';
+    script.verified_by = operatorId;
+    script.verified_at = new Date().toISOString();
+    script.test_evidence_sha256 = testEvidenceSha256;
+    const normalized = normalizeScript(script, {
+      origin: 'generated',
+      verification_status: script.verification_status,
+      artifact_id: script.artifact_id,
+      verified_by: script.verified_by,
+      verified_at: script.verified_at,
+      test_evidence_sha256: script.test_evidence_sha256,
+      sha256: script.sha256,
+    });
+    this.generated.scripts[scriptId] = normalized;
+    this.scripts[scriptId] = normalized;
+    await this.#persistGenerated();
+    return structuredClone(normalized);
   }
 
   async ingestInventory(inventory) {
