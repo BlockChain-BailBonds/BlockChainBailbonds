@@ -1,0 +1,5 @@
+{
+  "task":"List the installed Flipper apps and report storage status without changing device state",
+  "runId":"inventory-from-task-001",
+  "authorization":{"scope":"owned_asset","asset_id":"flipper-001","purpose":"inventory an owned test device","region_profile":"US-LAB","operator_id":"local-operator"}
+}

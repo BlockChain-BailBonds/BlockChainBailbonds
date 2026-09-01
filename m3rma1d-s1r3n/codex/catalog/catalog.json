@@ -1,0 +1,65 @@
+{
+  "catalog_version": "1.0",
+  "capabilities": {
+    "help": {"operation":"named_cli","command_id":"stock.help","adapter_id":"stock.help","risk":"observe","libraries":[]},
+    "device_info": {"operation":"named_cli","command_id":"stock.device_info","adapter_id":"stock.device_info","risk":"observe","libraries":[]},
+    "storage_info": {"operation":"named_cli","command_id":"stock.storage_info","adapter_id":"stock.storage_info","risk":"observe","libraries":[]},
+    "loader_list": {"operation":"loader_list","adapter_id":"stock.loader.list","risk":"observe","libraries":[]},
+    "loader_info": {"operation":"loader_info","adapter_id":"stock.loader.info","risk":"observe","libraries":[]}
+  },
+  "named_commands": {
+    "stock.help": {"template":"help","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false}},
+    "stock.device_info": {"template":"device_info","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false}},
+    "stock.storage_info": {"template":"storage_info","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false}},
+    "stock.loader.list": {"template":"loader list","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false}},
+    "stock.loader.info": {"template":"loader info","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false}},
+    "stock.gpio.read": {"template_id":"gpio.read","risk":"observe","arguments_schema":{"type":"object","additionalProperties":false,"required":["pin"],"properties":{"pin":{"type":"integer","minimum":0,"maximum":15}}}}
+  },
+  "apps": {
+    "system.loader": {
+      "display_name":"Loader",
+      "functions": {
+        "list":{"operation":"loader_list","adapter_id":"stock.loader.list","risk":"observe","libraries":[]},
+        "info":{"operation":"loader_info","adapter_id":"stock.loader.info","risk":"observe","libraries":[]},
+        "open":{"operation":"loader_open","adapter_id":"stock.loader.open","risk":"local_state","libraries":[]},
+        "close":{"operation":"loader_close","adapter_id":"stock.loader.close","risk":"local_state","libraries":[]}
+      }
+    },
+    "system.gpio": {
+      "display_name":"GPIO",
+      "functions": {
+        "read":{"operation":"named_cli","command_id":"stock.gpio.read","adapter_id":"stock.gpio.read","risk":"observe","libraries":[]}
+      }
+    },
+    "infrared": {
+      "display_name":"Infrared",
+      "functions": {
+        "open_file":{"operation":"adapter","adapter_id":"infrared.open_file","risk":"local_state","libraries":[]},
+        "transmit_owned_signal":{"operation":"adapter","adapter_id":"infrared.transmit_owned","risk":"transmit","frequency":{"medium":"infrared","carrier_hz":38000},"libraries":[]}
+      }
+    },
+    "subghz": {
+      "display_name":"Sub-GHz",
+      "functions": {
+        "open_recording":{"operation":"adapter","adapter_id":"subghz.open_recording","risk":"local_state","libraries":[]},
+        "receive_owned_test":{"operation":"adapter","adapter_id":"subghz.receive_owned_test","risk":"observe","libraries":[]},
+        "transmit_owned_recording":{"operation":"adapter","adapter_id":"subghz.transmit_owned","risk":"transmit","libraries":[]}
+      }
+    },
+    "nfc": {
+      "display_name":"NFC",
+      "functions": {
+        "inventory_owned_tag":{"operation":"adapter","adapter_id":"nfc.inventory_owned","risk":"observe","libraries":[]},
+        "open_owned_dump":{"operation":"adapter","adapter_id":"nfc.open_owned_dump","risk":"local_state","libraries":[]}
+      }
+    },
+    "lf_rfid": {
+      "display_name":"125 kHz RFID",
+      "functions": {
+        "inventory_owned_tag":{"operation":"adapter","adapter_id":"lfrfid.inventory_owned","risk":"observe","libraries":[]},
+        "open_owned_dump":{"operation":"adapter","adapter_id":"lfrfid.open_owned_dump","risk":"local_state","libraries":[]}
+      }
+    }
+  },
+  "scripts": {}
+}

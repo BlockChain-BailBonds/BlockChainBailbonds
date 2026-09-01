@@ -1,0 +1,35 @@
+name: M3rMa1d S1r3n Codex
+
+on:
+  push:
+    branches:
+      - main
+      - feat/m3rma1d-s1r3n-integrated-firmware
+    paths:
+      - 'm3rma1d-s1r3n/adl/**'
+      - 'm3rma1d-s1r3n/codex/**'
+      - '.github/workflows/m3rma1d-codex.yml'
+  pull_request:
+    paths:
+      - 'm3rma1d-s1r3n/adl/**'
+      - 'm3rma1d-s1r3n/codex/**'
+      - '.github/workflows/m3rma1d-codex.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: m3rma1d-s1r3n/codex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm test
+      - run: npm run check
+      - run: node src/cli.mjs preview --file examples/read-only-run.json > /tmp/m3rma1d-preview.json
+      - run: test -s /tmp/m3rma1d-preview.json

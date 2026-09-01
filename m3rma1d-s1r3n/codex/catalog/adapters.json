@@ -1,0 +1,73 @@
+{
+  "adapter_catalog_version": "1.0",
+  "adapters": {
+    "stock.loader.list": {
+      "adapter_version":"1.0","adapter_id":"stock.loader.list","app_id":"system.loader","function":"list","risk":"observe",
+      "operations":[{"op":"loader_list"}],"test_plan":["Returns an application list without changing device state"]
+    },
+    "stock.loader.info": {
+      "adapter_version":"1.0","adapter_id":"stock.loader.info","app_id":"system.loader","function":"info","risk":"observe",
+      "operations":[{"op":"loader_info"}],"test_plan":["Returns current loader state"]
+    },
+    "stock.loader.open": {
+      "adapter_version":"1.0","adapter_id":"stock.loader.open","app_id":"system.loader","function":"open","risk":"local_state",
+      "arguments_schema":{"type":"object","additionalProperties":false,"required":["app_name"],"properties":{"app_name":{"type":"string","maxLength":64}}},
+      "operations":[{"op":"loader_open","app_name":"${app_name}"}],"test_plan":["Open a harmless installed app and confirm loader info","Close the app"]
+    },
+    "stock.loader.close": {
+      "adapter_version":"1.0","adapter_id":"stock.loader.close","app_id":"system.loader","function":"close","risk":"local_state",
+      "operations":[{"op":"loader_close"}],"test_plan":["Close a test app and confirm loader reports no running application"]
+    },
+    "stock.help": {
+      "adapter_version":"1.0","adapter_id":"stock.help","app_id":"system.cli","function":"help","risk":"observe",
+      "operations":[{"op":"named_cli","command_id":"stock.help"}],"test_plan":["Returns the registered command help without changing state"]
+    },
+    "stock.device_info": {
+      "adapter_version":"1.0","adapter_id":"stock.device_info","app_id":"system.device","function":"info","risk":"observe",
+      "operations":[{"op":"named_cli","command_id":"stock.device_info"}],"test_plan":["Returns device information without changing state"]
+    },
+    "stock.storage_info": {
+      "adapter_version":"1.0","adapter_id":"stock.storage_info","app_id":"system.storage","function":"info","risk":"observe",
+      "operations":[{"op":"named_cli","command_id":"stock.storage_info"}],"test_plan":["Returns storage information without changing state"]
+    },
+    "stock.gpio.read": {
+      "adapter_version":"1.0","adapter_id":"stock.gpio.read","app_id":"system.gpio","function":"read","risk":"observe",
+      "arguments_schema":{"type":"object","additionalProperties":false,"required":["pin"],"properties":{"pin":{"type":"integer","minimum":0,"maximum":15}}},
+      "operations":[{"op":"named_cli","command_id":"stock.gpio.read","arguments":{"pin":"${pin}"}}],"test_plan":["Reads only a configured GPIO input and makes no output change"]
+    },
+    "infrared.open_file": {
+      "adapter_version":"1.0","adapter_id":"infrared.open_file","app_id":"infrared","function":"open_file","risk":"local_state",
+      "arguments_schema":{"type":"object","additionalProperties":false,"required":["artifact_id"],"properties":{"artifact_id":{"type":"string","maxLength":64}}},
+      "operations":[{"op":"artifact_stage","artifact_id":"${artifact_id}"},{"op":"loader_open","app_name":"Infrared"},{"op":"wait_ms","ms":500}],
+      "test_plan":["Stage an owned IR artifact","Open Infrared without transmitting"]
+    },
+    "infrared.transmit_owned": {
+      "adapter_version":"1.0","adapter_id":"infrared.transmit_owned","app_id":"infrared","function":"transmit_owned_signal","risk":"transmit",
+      "requires":{"frequency_profile":"ir.consumer.38khz"},
+      "arguments_schema":{"type":"object","additionalProperties":false,"required":["artifact_id"],"properties":{"artifact_id":{"type":"string","maxLength":64}}},
+      "operations":[{"op":"artifact_stage","artifact_id":"${artifact_id}"},{"op":"deck_confirm"},{"op":"loader_open","app_name":"Infrared"}],
+      "test_plan":["Use only a remote and appliance owned by the operator","Confirm Deck approval appears before transmission","Confirm STOP cancels before output"]
+    },
+    "subghz.open_recording": {
+      "adapter_version":"1.0","adapter_id":"subghz.open_recording","app_id":"subghz","function":"open_recording","risk":"local_state",
+      "arguments_schema":{"type":"object","additionalProperties":false,"required":["artifact_id"],"properties":{"artifact_id":{"type":"string","maxLength":64}}},
+      "operations":[{"op":"artifact_stage","artifact_id":"${artifact_id}"},{"op":"loader_open","app_name":"Sub-GHz"}],
+      "test_plan":["Open an owned recording without transmitting"]
+    },
+    "subghz.receive_owned_test": {
+      "adapter_version":"1.0","adapter_id":"subghz.receive_owned_test","app_id":"subghz","function":"receive_owned_test","risk":"observe",
+      "operations":[{"op":"loader_open","app_name":"Sub-GHz"}],
+      "test_plan":["Receive only inside the authorized test scope","Confirm no transmit operation is issued"]
+    },
+    "nfc.inventory_owned": {
+      "adapter_version":"1.0","adapter_id":"nfc.inventory_owned","app_id":"nfc","function":"inventory_owned_tag","risk":"observe",
+      "operations":[{"op":"loader_open","app_name":"NFC"}],
+      "test_plan":["Use an owned lab tag","Confirm no emulation or write operation"]
+    },
+    "lfrfid.inventory_owned": {
+      "adapter_version":"1.0","adapter_id":"lfrfid.inventory_owned","app_id":"lf_rfid","function":"inventory_owned_tag","risk":"observe",
+      "operations":[{"op":"loader_open","app_name":"125 kHz RFID"}],
+      "test_plan":["Use an owned lab tag","Confirm no emulation or write operation"]
+    }
+  }
+}

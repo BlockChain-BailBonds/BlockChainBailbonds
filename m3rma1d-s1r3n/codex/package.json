@@ -1,0 +1,17 @@
+{
+  "name": "@918tech/m3rma1d-s1r3n-codex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Codex/ADL orchestration service for the M3rMa1d S1r3n device mesh",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "cli": "node src/cli.mjs",
+    "check": "node src/check.mjs",
+    "test": "node --test",
+    "mock-core": "node src/mock-core.mjs"
+  }
+}

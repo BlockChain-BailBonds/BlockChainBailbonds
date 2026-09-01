@@ -1,0 +1,14 @@
+{
+  "library_catalog_version":"1.0",
+  "libraries": {
+    "flipper.official.firmware-api": {
+      "id":"flipper.official.firmware-api",
+      "source_type":"git",
+      "url":"https://github.com/flipperdevices/flipperzero-firmware",
+      "revision":"2d8711939ac8442a572219ed0fb4beaa02a89858",
+      "sha256":"revision:2d8711939ac8442a572219ed0fb4beaa02a89858",
+      "license":"GPL-3.0-or-later",
+      "trusted":true
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M3rMa1d Declarative Script",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["script_version", "script_id", "description", "risk", "steps"],
+  "properties": {
+    "script_version": {"const": "1.0"},
+    "script_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "description": {"type": "string", "minLength": 3, "maxLength": 512},
+    "risk": {"type": "string", "enum": ["observe", "local_state", "physical_output", "transmit", "restricted"]},
+    "inputs_schema": {"type": "object"},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "app_id", "function"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "app_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "function": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "arguments": {"type": "object", "maxProperties": 32},
+          "approval": {"type": "string", "enum": ["auto", "deck", "operator"]},
+          "frequency_profile": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "artifact_refs": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
+          "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000}
+        }
+      }
+    }
+  }
+}

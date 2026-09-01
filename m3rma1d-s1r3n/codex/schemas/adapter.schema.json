@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M3rMa1d App Adapter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adapter_version", "adapter_id", "app_id", "function", "risk", "operations", "test_plan"],
+  "properties": {
+    "adapter_version": {"const": "1.0"},
+    "adapter_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "app_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "function": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "description": {"type": "string", "maxLength": 512},
+    "risk": {"type": "string", "enum": ["observe", "local_state", "physical_output", "transmit", "restricted"]},
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
+        "libraries": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
+        "frequency_profile": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+        "vision": {"type": "boolean"}
+      }
+    },
+    "arguments_schema": {"type": "object"},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op"],
+        "properties": {
+          "op": {"type": "string", "enum": ["loader_list", "loader_info", "loader_open", "loader_close", "named_cli", "input_key", "wait_ms", "artifact_stage", "expect", "capture_vision", "deck_confirm"]},
+          "app_name": {"type": "string", "maxLength": 64},
+          "command_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "key": {"type": "string", "enum": ["up", "down", "left", "right", "ok", "back"]},
+          "press": {"type": "string", "enum": ["short", "long", "press", "release"]},
+          "ms": {"type": "integer", "minimum": 1, "maximum": 10000},
+          "artifact_id": {"type": "string", "pattern": "^[A-Za-z0-9._:${}-]{1,64}$"},
+          "expectation": {"type": "string", "maxLength": 256},
+          "arguments": {"type": "object", "maxProperties": 32}
+        }
+      }
+    },
+    "test_plan": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 3, "maxLength": 256}}
+  }
+}
