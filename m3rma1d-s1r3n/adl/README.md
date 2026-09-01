@@ -1,51 +1,62 @@
 # M3rMa1d S1r3n ADL 2.0
 
-ADL is the deterministic authority boundary between Codex planning and hardware execution.
+ADL is the deterministic authority boundary between Codex planning and physical execution.
 
 ```text
-operator goal
+operator authorization and goal
   -> Codex Structured Output
   -> ADL validation
-  -> app/script/library/frequency resolution
-  -> adapter materialization
-  -> Core authorization
+  -> verified app/script/library/artifact resolution
+  -> content-addressed adapter materialization
+  -> signed Core request
+  -> three-C5 safety quorum
   -> CYD Deck approval and STOP gate
-  -> CYD-only Flipper GPIO bridge
-  -> result and hash-chained audit
+  -> CYD-only Flipper Expansion UART/RPC
+  -> signed result and hash-chained audit
 ```
 
-## ADL step kinds
+## Step kinds
 
-- `capability`: a cataloged system capability such as device information or app inventory.
-- `app`: an installed Flipper app and a typed function.
-- `script`: a declarative sequence of app functions. It is not shell or executable source code.
+- `capability`: a cataloged, adapter-backed system capability.
+- `app`: a typed function for an installed Flipper application or service.
+- `script`: a bounded sequence of catalog app functions. A script is declarative data, not source code, shell text, or raw protocol bytes.
 
-An unknown app function can trigger Codex adapter generation when `allow_generate_adapter=true`. The generated manifest is schema-checked, scanned for prohibited primitives, hashed, staged, registered, and resolved again before it can become a job.
+## Generated logic
 
-## Resolution
+When explicitly permitted by the operator's resolution policy, Codex may generate a candidate adapter or script. Generated material is validated, scanned for prohibited fields, canonicalized, SHA-256 hashed, and stored as `staged_pending_review`.
 
-A run controls whether the resolver may:
+Generated material does **not** become executable merely because it was generated successfully. It requires:
 
-- install or build reviewed components;
-- generate declarative scripts or adapters;
-- resolve pinned libraries;
-- resolve an operator-maintained frequency profile.
+1. physical testing against the intended owned asset or isolated lab;
+2. preserved test evidence;
+3. operator promotion of the exact generated SHA-256 with the evidence SHA-256;
+4. explicit enabling of generated-adapter execution;
+5. operator approval and Deck confirmation for the resulting job;
+6. Vision verification when required by policy.
 
-`official_and_pinned` accepts trusted, pinned sources. `pinned_only` accepts any explicitly pinned source permitted by the artifact policy. `local_only` requires locally staged material.
+## Resolution policies
 
-## Execution invariants
+- `official_and_pinned`: only trusted official sources pinned to immutable revisions.
+- `pinned_only`: operator-approved pinned sources permitted by the artifact policy.
+- `local_only`: material already staged and verified in the local artifact store.
 
-1. The CYD Deck is the only physical Flipper GPIO owner.
-2. Every job target is `flipper-link`; no physical fallback route exists.
-3. Model output never becomes a raw command.
-4. Unknown risk classes and `restricted` operations are denied.
-5. Physical output and transmit operations require Deck approval.
-6. Transmit operations require an authorization scope, a resolved frequency/carrier profile, a transmit declaration, and—outside an isolated lab—an owned source artifact.
-7. Libraries and generated artifacts must be pinned by SHA-256 or immutable revision.
-8. STOP cancels the active run before the next job.
-9. Each transition is recorded in a hash-chained audit log.
-10. Core and Deck re-check policy; gateway validation is not the sole authority.
+All resolution booleans are explicit in every run. Codex is not permitted to silently broaden them or alter the authorization envelope.
+
+## Invariants
+
+1. The CYD Deck is the sole physical Flipper GPIO owner.
+2. Every executable job targets `flipper-link`; no fallback route exists.
+3. Model output never becomes a raw command, CLI string, shell program, or arbitrary protocol frame.
+4. Every executable function resolves to a content-addressed adapter whose verification status is `bundled_verified` or `operator_verified`.
+5. Unknown and `restricted` operations are denied.
+6. Physical-output and transmit operations require approval and an explicit `deck_confirm` operation.
+7. Transmit operations additionally require an authorized asset/lab scope, a resolved profile, a transmit declaration, and an owned source artifact outside an isolated lab.
+8. Libraries use immutable revisions and verified descriptors. Artifacts use full SHA-256 verification before transfer and again before execution.
+9. The host and Core exchange signed envelopes with timestamps, nonces, fixed routing, and signed responses.
+10. Core readiness must attest the CYD, Flipper, all three C5 safety nodes, STOP state, and no fallback route.
+11. STOP is checked before a run and again before every concrete job.
+12. Every request, approval, artifact transfer, result, STOP event, generated-material promotion, and Vision decision enters the tamper-evident audit chain.
 
 ## Example
 
-See `../codex/examples/read-only-run.json` and `../codex/examples/owned-ir-run.json`.
+The checked-in read-only contract is `../codex/examples/read-only-run.json`. It uses official RPC-backed device and storage operations and does not contain a transmit step.
