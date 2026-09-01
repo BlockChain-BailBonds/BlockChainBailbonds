@@ -72,7 +72,7 @@
         },
         "approval": {"type": "string", "enum": ["auto", "deck", "operator"], "default": "auto"},
         "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000, "default": 10000},
-        "on_error": {"type": "string", "enum": ["stop", "continue", "rollback"], "default": "stop"}
+        "on_error": {"type": "string", "enum": ["stop", "continue"], "default": "stop"}
       },
       "allOf": [
         {"if": {"properties": {"kind": {"const": "capability"}}, "required": ["kind"]}, "then": {"required": ["capability"]}},
