@@ -1,12 +1,13 @@
 export {createService} from './factory.mjs';
-export {OpenAIResponsesClient} from './openai-responses.mjs';
+export {OpenAIResponsesClient, buildStructuredRequest, extractOutputText} from './openai-responses.mjs';
 export {CodexPlanner} from './planner.mjs';
 export {CodexGenerator} from './generator.mjs';
-export {CatalogService, validateAdapter} from './catalog.mjs';
+export {CatalogService, validateAdapter, validateScript} from './catalog.mjs';
 export {ArtifactStore} from './artifacts.mjs';
 export {FrequencyResolver} from './frequencies.mjs';
 export {AuditLog} from './audit.mjs';
 export {StopState} from './stop.mjs';
-export {HttpCoreTransport, DryRunTransport, signEnvelope, createEnvelope} from './transport.mjs';
+export {RemoteDeckApprovalService} from './approvals.mjs';
+export {HttpCoreTransport, signEnvelope, createEnvelope, verifyResponseEnvelope} from './transport.mjs';
 export {MermaidCodexService} from './orchestrator.mjs';
 export {VisionClient} from './vision.mjs';
