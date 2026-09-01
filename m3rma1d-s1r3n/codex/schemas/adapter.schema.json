@@ -1,23 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "M3rMa1d App Adapter",
+  "$id": "https://918tech.example/m3rma1d-s1r3n/codex/schemas/adapter.schema.json",
+  "title": "M3rMa1d Verified Flipper RPC Adapter",
   "type": "object",
   "additionalProperties": false,
   "required": ["adapter_version", "adapter_id", "app_id", "function", "risk", "operations", "test_plan"],
   "properties": {
     "adapter_version": {"const": "1.0"},
-    "adapter_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-    "app_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-    "function": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "adapter_id": {"$ref": "#/$defs/id"},
+    "app_id": {"$ref": "#/$defs/id"},
+    "function": {"$ref": "#/$defs/id"},
     "description": {"type": "string", "maxLength": 512},
     "risk": {"type": "string", "enum": ["observe", "local_state", "physical_output", "transmit", "restricted"]},
     "requires": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "artifacts": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
-        "libraries": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
-        "frequency_profile": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+        "artifacts": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "libraries": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "frequency_profile": {"$ref": "#/$defs/id"},
         "vision": {"type": "boolean"}
       }
     },
@@ -26,23 +27,59 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 128,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["op"],
-        "properties": {
-          "op": {"type": "string", "enum": ["loader_list", "loader_info", "loader_open", "loader_close", "named_cli", "input_key", "wait_ms", "artifact_stage", "expect", "capture_vision", "deck_confirm"]},
-          "app_name": {"type": "string", "maxLength": 64},
-          "command_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-          "key": {"type": "string", "enum": ["up", "down", "left", "right", "ok", "back"]},
-          "press": {"type": "string", "enum": ["short", "long", "press", "release"]},
-          "ms": {"type": "integer", "minimum": 1, "maximum": 10000},
-          "artifact_id": {"type": "string", "pattern": "^[A-Za-z0-9._:${}-]{1,64}$"},
-          "expectation": {"type": "string", "maxLength": 256},
-          "arguments": {"type": "object", "maxProperties": 32}
-        }
-      }
+      "items": {"$ref": "#/$defs/operation"}
     },
-    "test_plan": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 3, "maxLength": 256}}
+    "test_plan": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {"type": "string", "minLength": 3, "maxLength": 256}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^/(int|ext|any)(/[A-Za-z0-9._ ()+-]+)*$"},
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "system_device_info",
+            "system_power_info",
+            "storage_info",
+            "storage_list",
+            "storage_stat",
+            "storage_write",
+            "app_start",
+            "app_exit",
+            "app_load_file",
+            "app_button",
+            "gui_input",
+            "gpio_read",
+            "property_get",
+            "wait_ms",
+            "artifact_stage",
+            "expect",
+            "capture_vision",
+            "deck_confirm"
+          ]
+        },
+        "path": {"$ref": "#/$defs/path"},
+        "destination_path": {"$ref": "#/$defs/path"},
+        "app_name": {"type": "string", "minLength": 1, "maxLength": 64},
+        "args": {"type": "string", "maxLength": 256},
+        "key": {"type": "string", "enum": ["up", "down", "right", "left", "ok", "back"]},
+        "press": {"type": "string", "enum": ["press", "release", "short", "long"]},
+        "index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "pin": {"type": "string", "enum": ["PC0", "PC1", "PC3", "PB2", "PB3", "PA4", "PA6", "PA7"]},
+        "property_key": {"type": "string", "minLength": 1, "maxLength": 128},
+        "ms": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "artifact_id": {"type": "string", "pattern": "^[A-Za-z0-9._:${}-]{1,96}$"},
+        "expectation": {"type": "string", "minLength": 3, "maxLength": 256}
+      }
+    }
   }
 }
