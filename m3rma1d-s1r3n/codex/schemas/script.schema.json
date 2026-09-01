@@ -48,7 +48,7 @@
         },
         "library_refs": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
-        "on_error": {"type": "string", "enum": ["stop", "continue", "rollback"]}
+        "on_error": {"type": "string", "enum": ["stop", "continue"]}
       }
     }
   }
