@@ -1,46 +1,25 @@
-import readline from 'node:readline/promises';
-import {stdin as input, stdout as output} from 'node:process';
-
-export class DenyApprovalService {
-  async request() {
-    return false;
-  }
-}
-
-export class ConsoleApprovalService {
-  constructor({timeoutMs = 60000} = {}) {
-    this.timeoutMs = timeoutMs;
-  }
-
-  async request(job, deadline) {
-    const remaining = Math.max(1, Math.min(this.timeoutMs, deadline - Date.now()));
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), remaining);
-    const rl = readline.createInterface({input, output});
-    try {
-      const answer = await rl.question(
-        `Approve ${job.app_id || job.kind}.${job.function || job.operation} ` +
-        `[risk=${job.risk}, asset=${job.frequency?.asset_id ?? 'n/a'}]? type YES: `,
-        {signal: controller.signal},
-      );
-      return answer.trim() === 'YES';
-    } catch (error) {
-      if (error.name === 'AbortError') return false;
-      throw error;
-    } finally {
-      clearTimeout(timer);
-      rl.close();
-    }
-  }
-}
+import {invariant} from './utils.mjs';
 
 export class RemoteDeckApprovalService {
   constructor({transport}) {
+    invariant(transport && typeof transport.requestApproval === 'function', 'Deck approval transport is required');
     this.transport = transport;
   }
 
   async request(job, deadline) {
-    const result = await this.transport.requestApproval(job, deadline);
-    return result?.approved === true;
+    invariant(job?.job_id, 'approval request requires job_id');
+    const response = await this.transport.requestApproval(job, deadline);
+    invariant(response && typeof response === 'object' && !Array.isArray(response), 'invalid Deck approval response');
+    invariant(response.job_id === job.job_id, 'Deck approval job mismatch');
+    invariant(typeof response.approved === 'boolean', 'Deck approval decision missing');
+
+    if (!response.approved) return false;
+
+    invariant(/^[A-Za-z0-9._:-]{8,128}$/.test(response.approval_id ?? ''), 'Deck approval ID missing or malformed');
+    const expiresAt = Date.parse(response.expires_at ?? '');
+    invariant(Number.isFinite(expiresAt), 'Deck approval expiration missing');
+    invariant(expiresAt > Date.now() && expiresAt <= deadline, 'Deck approval lease is invalid');
+    invariant(response.physical_owner === 'deck-cyd', 'approval was not issued by the CYD Deck');
+    return true;
   }
 }
