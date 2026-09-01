@@ -65,7 +65,7 @@ for (const [libraryId, library] of Object.entries(libraries)) {
 
 const sourceDir = path.join(root, 'src');
 const sourceFiles = (await readdir(sourceDir)).filter((name) => name.endsWith('.mjs') && name !== 'check.mjs');
-const forbiddenRuntime = /(DryRunTransport|mock[-_ ]core|dry_run|MOCK CORE|simulated Flipper)/i;
+const forbiddenRuntime = /\b(DryRunTransport|DenyApprovalService|ConsoleApprovalService|MockCore|dryRun)\b|S1R3N_DRY_RUN|mock-core\.mjs/i;
 for (const name of sourceFiles) {
   const text = await readFile(path.join(sourceDir, name), 'utf8');
   if (forbiddenRuntime.test(text)) throw new Error(`development substitute remains in production source: src/${name}`);
