@@ -1,0 +1,26 @@
+{
+  "routing_version": "1.0",
+  "logical_target": "flipper",
+  "physical_owner": "deck-cyd",
+  "bridge": {
+    "interface": "uart",
+    "uart_port": 2,
+    "baud": 230400,
+    "format": "8N1",
+    "deck_rx_gpio": 22,
+    "deck_tx_gpio": 27,
+    "flipper_tx_pin": 13,
+    "flipper_rx_pin": 14,
+    "ground_pin": 18,
+    "power_connection": false
+  },
+  "forbidden_direct_nodes": [
+    "core-s3",
+    "vision-s3cam",
+    "c5-supermini-1",
+    "c5-supermini-2",
+    "c5-supermini-3"
+  ],
+  "failure_mode": "fail_closed",
+  "fallback_physical_route": false
+}
