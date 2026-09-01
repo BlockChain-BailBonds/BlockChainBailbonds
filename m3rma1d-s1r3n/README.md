@@ -1,15 +1,30 @@
 # M3rMa1d S1r3n
-Integrated embedded control stack for ESP32-S3 N16R8 Core, ESP32-S3 camera Vision, ESP32-WROOM-32E CYD Deck, ESP32-C3 SuperMini Sentinel, and Flipper Zero over 3.3 V UART.
 
-Safety model: named capabilities only; no raw CLI job; Sentinel is an independent fail-closed interlock; IR transmission requires approval.
+Integrated Codex/ADL automation stack for:
+
+- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 Core, camera removed
+- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 Vision with OV3660
+- 3 x ESP32-C5 SuperMini control-plane nodes
+- 1 x ESP32-32E N4 CYD Deck, 2.8 in ILI9341/XPT2046 touchscreen
+- 1 x Flipper Zero
+
+## Physical boundary
+
+The **CYD Deck is the only device electrically connected to the Flipper GPIO header**. It uses UART2 mapped to CYD GPIO22/GPIO27. Core, Vision, and all three C5 nodes communicate with the Deck through the authenticated control plane and have no direct Flipper GPIO path.
+
+## Authority boundary
+
+Codex produces ADL intent. The gateway resolves app adapters, scripts, pinned libraries, and region/asset frequency profiles. Core applies run policy, the CYD presents required approvals and STOP, and only the CYD bridge translates an approved operation into the Flipper-facing adapter command. No physical fallback route is permitted.
 
 ## Verified host-side
+
 - CRC32 standard vector
 - capability allowlist
 - raw-shell denial
 - approval requirement
-- E-STOP interlock
-- stale-heartbeat interlock
+- E-STOP/stale-health simulation
+- CYD-only Flipper routing policy static test
 
 ## Not yet physically verified
-Actual attached-device display/touch, camera, UART/Flipper, E-STOP timing and ESP-NOW tests require the hardware. Follow `docs/WIRING.md` acceptance tests before treating a board as verified.
+
+Actual display/touch, OV3660 camera, C5 control-plane transport, CYD-to-Flipper UART, STOP timing, and end-to-end ADL runs require the assembled hardware. Follow `docs/WIRING.md` and record unperformed hardware checks as `NOT TESTED`.
