@@ -1,11 +1,76 @@
 #include <Arduino.h>
 #include "protocol.hpp"
+
 using namespace s1r3n;
-HardwareSerial Flipper(1);
-static constexpr int FLIP_RX=18,FLIP_TX=17,SENTINEL_ENABLE=4,SENTINEL_HB=5;
-uint32_t lastSentinelEdge=0;bool lastHb=false;
-String commandFor(const JobRequest& j){switch(j.capability){case Capability::Help:return "help\r";case Capability::DeviceInfo:return "device_info\r";case Capability::StorageInfo:return "storage_info\r";case Capability::LoaderList:return "loader list\r";case Capability::IrTransmit:return String("ir tx ")+j.argument+"\r";case Capability::GpioRead:return String("gpio read ")+j.argument+"\r";default:return "";}}
-bool sentinelHealthy(){bool v=digitalRead(SENTINEL_HB);if(v!=lastHb){lastHb=v;lastSentinelEdge=millis();}return digitalRead(SENTINEL_ENABLE)==HIGH&&millis()-lastSentinelEdge<2500;}
-bool executeJob(const JobRequest& j,bool approved,JobResult& out){out.job_id=j.job_id;if(!sentinelHealthy()){out.code=-10;strncpy(out.text,"sentinel interlock open",sizeof(out.text));return false;}if(!capabilityAllowed(j.capability)){out.code=-11;strncpy(out.text,"capability denied",sizeof(out.text));return false;}if(needsApproval(j.capability)&&!approved){out.code=-12;strncpy(out.text,"approval required",sizeof(out.text));return false;}String cmd=commandFor(j);if(!cmd.length()){out.code=-13;return false;}Flipper.print(cmd);uint32_t until=millis()+min<uint16_t>(j.timeout_ms,5000);String r;while((int32_t)(until-millis())>0){while(Flipper.available()){char c=Flipper.read();if(c=='\n'&&r.length())goto done;r+=c;}delay(1);}done:out.code=r.length()?0:-14;snprintf(out.text,sizeof(out.text),"%s",r.c_str());return out.code==0;}
-void setup(){Serial.begin(115200);pinMode(SENTINEL_ENABLE,INPUT);pinMode(SENTINEL_HB,INPUT);Flipper.begin(230400,SERIAL_8N1,FLIP_RX,FLIP_TX);Serial.println("M3rMa1d S1r3n Core ready");}
-void loop(){sentinelHealthy();delay(10);}
+
+// Core owns orchestration and ADL policy. It has no electrical connection to
+// the Flipper. Every authorized job is routed through the CYD Deck bridge.
+static volatile bool deckOnline = false;
+static volatile bool safetyMeshHealthy = false;
+static volatile bool stopAsserted = true;
+
+static void setResult(JobResult& out, uint32_t jobId, int16_t code, const char* text) {
+  out.job_id = jobId;
+  out.code = code;
+  snprintf(out.text, sizeof(out.text), "%s", text ? text : "");
+}
+
+void coreSetDeckOnline(bool online) {
+  deckOnline = online;
+  if (!online) stopAsserted = true;
+}
+
+void coreSetSafetyMeshHealthy(bool healthy) {
+  safetyMeshHealthy = healthy;
+  if (!healthy) stopAsserted = true;
+}
+
+void coreAssertStop() {
+  stopAsserted = true;
+}
+
+bool coreClearStop(bool authenticated) {
+  if (!authenticated || !deckOnline || !safetyMeshHealthy) return false;
+  stopAsserted = false;
+  return true;
+}
+
+bool coreAuthorizeJobForDeck(const JobRequest& job, bool approved, JobResult& out) {
+  if (stopAsserted) {
+    setResult(out, job.job_id, -20, "core STOP asserted");
+    return false;
+  }
+  if (!safetyMeshHealthy) {
+    setResult(out, job.job_id, -10, "safety mesh unhealthy");
+    return false;
+  }
+  if (!deckOnline) {
+    setResult(out, job.job_id, -22, "CYD Deck bridge offline");
+    return false;
+  }
+  if (!capabilityAllowed(job.capability)) {
+    setResult(out, job.job_id, -11, "capability denied");
+    return false;
+  }
+  if (needsApproval(job.capability) && !approved) {
+    setResult(out, job.job_id, -12, "Deck approval required");
+    return false;
+  }
+
+  setResult(out, job.job_id, 1, "authorized; route to CYD Deck");
+  return true;
+}
+
+void setup() {
+  Serial.begin(115200);
+  coreAssertStop();
+  Serial.println("M3rMa1d S1r3n Core ready");
+  Serial.println("No Flipper GPIO on Core; all jobs route through CYD Deck");
+}
+
+void loop() {
+  // The wireless/control-plane transport updates Deck and safety-node health,
+  // accepts ADL jobs, calls coreAuthorizeJobForDeck(), and forwards only an
+  // authorized job to the CYD. It must never fall back to a direct GPIO path.
+  delay(10);
+}
