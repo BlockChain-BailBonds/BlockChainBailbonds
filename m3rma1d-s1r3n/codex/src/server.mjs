@@ -3,11 +3,19 @@ import {createService} from './factory.mjs';
 import {constantTimeEqual} from './utils.mjs';
 
 function json(response, status, body) {
-  response.writeHead(status, {'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store'});
+  response.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+  });
   response.end(`${JSON.stringify(body)}\n`);
 }
 
 async function readBody(request, limit) {
+  if (!String(request.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) {
+    throw Object.assign(new Error('content-type must be application/json'), {statusCode: 415});
+  }
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
@@ -17,36 +25,43 @@ async function readBody(request, limit) {
   }
   if (!chunks.length) return {};
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    throw Object.assign(new Error('invalid JSON body'), {statusCode: 400});
+    const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('body must be an object');
+    return parsed;
+  } catch (error) {
+    throw Object.assign(new Error(`invalid JSON body: ${error.message}`), {statusCode: 400});
   }
 }
 
 function authorized(request, config) {
-  if (!config.service.apiTokenRequired) return true;
-  if (!config.service.apiToken) return false;
   const value = request.headers.authorization ?? '';
   const token = value.startsWith('Bearer ') ? value.slice(7) : '';
   return constantTimeEqual(token, config.service.apiToken);
 }
 
 const service = await createService();
-if (service.config.service.apiTokenRequired && !service.config.service.apiToken) {
-  throw new Error('S1R3N_API_TOKEN is required before starting the Codex HTTP service');
-}
 
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, 'http://localhost');
     if (request.method === 'GET' && url.pathname === '/health') {
-      return json(response, 200, {ok: true, service: service.config.service.name, dry_run: service.config.execution.dryRun});
+      return json(response, 200, {
+        ok: true,
+        service: service.config.service.name,
+        version: service.config.service.version,
+        production: true,
+      });
     }
+
     if (!authorized(request, service.config)) return json(response, 401, {error: 'unauthorized'});
 
+    if (request.method === 'GET' && url.pathname === '/ready') {
+      const readiness = await service.readiness({requireStopCleared: false});
+      return json(response, readiness.ready ? 200 : 503, readiness);
+    }
     if (request.method === 'GET' && url.pathname === '/v1/status') {
-      const [stop, control] = await Promise.all([service.stop.snapshot(), service.transport.status()]);
-      return json(response, 200, {stop, control, dry_run: service.config.execution.dryRun, active_runs: service.activeRuns});
+      const readiness = await service.readiness({requireStopCleared: false});
+      return json(response, 200, {...readiness, active_runs: service.activeRuns});
     }
     if (request.method === 'GET' && url.pathname === '/v1/catalog') {
       return json(response, 200, await service.catalog.snapshot());
@@ -54,40 +69,74 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/v1/audit/verify') {
       return json(response, 200, await service.audit.verify());
     }
-    if (request.method === 'POST' && url.pathname === '/v1/inventory/refresh') {
+
+    if (request.method !== 'POST') return json(response, 404, {error: 'not found'});
+    const body = await readBody(request, service.config.service.requestBodyLimit);
+
+    if (url.pathname === '/v1/inventory/refresh') {
       return json(response, 200, await service.inventory({refresh: true}));
     }
-
-    const body = await readBody(request, service.config.service.requestBodyLimit);
-    if (request.method === 'POST' && url.pathname === '/v1/plan') {
+    if (url.pathname === '/v1/plan') {
       return json(response, 200, await service.planTask(body));
     }
-    if (request.method === 'POST' && url.pathname === '/v1/preview') {
+    if (url.pathname === '/v1/preview') {
       const adl = body.adl ?? await service.planTask(body);
       return json(response, 200, await service.previewAdl(adl));
     }
-    if (request.method === 'POST' && url.pathname === '/v1/run') {
+    if (url.pathname === '/v1/run') {
       const result = body.adl ? await service.runAdl(body.adl) : await service.runTask(body);
       return json(response, 200, result);
     }
-    if (request.method === 'POST' && url.pathname === '/v1/stop') {
+    if (url.pathname === '/v1/stop') {
       return json(response, 200, await service.assertStop(body.reason ?? 'API stop'));
     }
-    if (request.method === 'POST' && url.pathname === '/v1/resume') {
+    if (url.pathname === '/v1/resume') {
+      if (body.confirm !== 'RESUME') throw Object.assign(new Error('resume requires confirm=RESUME'), {statusCode: 400});
       return json(response, 200, await service.clearStop({authenticated: true, reason: body.reason ?? 'API resume'}));
     }
-    if (request.method === 'POST' && url.pathname === '/v1/assets') {
+    if (url.pathname === '/v1/assets') {
       return json(response, 201, await service.frequencies.registerOwnedAsset(body));
+    }
+    if (url.pathname === '/v1/adapters/promote') {
+      const promoted = await service.catalog.promoteGeneratedAdapter(body);
+      await service.audit.write({
+        event: 'adapter.promoted',
+        adapter_id: promoted.adapter_id,
+        sha256: promoted.sha256,
+        verified_by: promoted.verified_by,
+        test_evidence_sha256: promoted.test_evidence_sha256,
+      });
+      return json(response, 200, promoted);
     }
     return json(response, 404, {error: 'not found'});
   } catch (error) {
-    const status = error.statusCode ?? 400;
+    const status = Number.isInteger(error.statusCode) ? error.statusCode : 400;
     await service.audit.write({event: 'api.error', method: request.method, path: request.url, error: error.message}).catch(() => {});
-    return json(response, status, {error: error.message});
+    return json(response, status, {error: error.message, ...(error.readiness ? {readiness: error.readiness} : {})});
   }
 });
 
+server.requestTimeout = 130000;
+server.headersTimeout = 15000;
+server.keepAliveTimeout = 5000;
+server.maxRequestsPerSocket = 100;
+
 server.listen(service.config.service.bindPort, service.config.service.bindHost, () => {
-  console.log(`${service.config.service.name} listening on http://${service.config.service.bindHost}:${service.config.service.bindPort}`);
-  console.log(`dry_run=${service.config.execution.dryRun}; physical Flipper owner=deck-cyd`);
+  console.log(`${service.config.service.name} ${service.config.service.version} listening on http://${service.config.service.bindHost}:${service.config.service.bindPort}`);
+  console.log('production=true; physical Flipper owner=deck-cyd; fallback route=false');
 });
+
+async function shutdown(signal) {
+  console.log(`${signal}: asserting STOP and closing service`);
+  await service.assertStop(`host shutdown: ${signal}`).catch((error) => console.error(`remote STOP failed: ${error.message}`));
+  server.close((error) => {
+    if (error) {
+      console.error(error);
+      process.exitCode = 1;
+    }
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
