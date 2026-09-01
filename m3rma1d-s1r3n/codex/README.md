@@ -1,90 +1,184 @@
-# M3rMa1d S1r3n Codex
+# M3rMa1d S1r3n Codex Control Plane
 
-This directory is the host-side Codex implementation for planning, resolving, approving, auditing, and executing ADL 2.0 Flipper runs.
+This directory contains the host-side production candidate for planning, resolving, approving, signing, auditing, and executing ADL 2.0 jobs against an operator-owned Flipper Zero.
 
-## Fixed topology
-
-Codex never talks directly to the Flipper GPIO header.
+## Fixed route
 
 ```text
-Codex service -> Core S3 -> authenticated wireless control plane -> CYD Deck -> 3.3 V UART -> Flipper
+Codex host
+  -> HMAC-authenticated Core ESP32-S3
+  -> authenticated control plane and three-node ESP32-C5 safety quorum
+  -> ESP32-32E N4 CYD Deck
+  -> Flipper Expansion UART/RPC
+  -> Flipper Zero
 ```
 
-The ESP32-32E N4 CYD Deck is the sole physical Flipper bridge. Core, Vision, and the three C5 nodes have no Flipper GPIO fallback path.
+The CYD Deck is the sole physical Flipper bridge. Every request and response asserts:
 
-## What is implemented
+```json
+{
+  "logical_target": "flipper",
+  "physical_owner": "deck-cyd",
+  "fallback_physical_route": false
+}
+```
 
-- OpenAI Responses API client using strict JSON-schema Structured Outputs
-- Natural-language goal to ADL 2.0 planner
-- Dynamic app/function adapter generation in a declarative adapter format
-- Declarative script generation
-- Installed-app inventory ingestion
-- Capability, app, script, library, artifact, and frequency resolution
-- SHA-256 artifact verification and optional pinned HTTPS retrieval
-- Owned-asset frequency profiles; transmit profiles do not resolve without an asset allowlist
-- Deck/operator approval services
-- HMAC-SHA256 authenticated Core transport
-- Deck-only routing invariant in every execution envelope
-- Fail-closed STOP state
-- Hash-chained JSONL audit log
-- Optional Vision S3 closed-loop verification
-- CLI and authenticated HTTP API
-- Dry-run transport and host-side tests
+## Runtime characteristics
 
-## Important execution boundary
+The production runtime has no mock Core, no simulated Flipper, no dry-run transport, no console approval substitute, and no raw CLI operation. Previewing a run performs validation and materialization only; executing a run requires signed readiness from the real Core and its attached hardware.
 
-“Any app or function” means an installed app can be discovered and addressed through a typed adapter. It does not mean unrestricted shell access. When a function is missing, Codex may generate a declarative adapter or script, which is schema-checked, scanned for prohibited primitives, hashed, staged, and then re-resolved. The gateway never lets model text become a raw Flipper command.
+The host service provides:
 
-Built-in stock functions include device/storage information, app listing/status/open/close, owned-tag inventory workflows, owned IR artifact workflows, and owned/lab Sub-GHz workflows. New app functions enter through the same adapter pipeline.
+- OpenAI Responses API structured output planning;
+- ADL 2.0 validation;
+- authorization, expiration, route, and operation bounds;
+- real Flipper inventory ingestion from Core/CYD;
+- typed adapter and declarative script generation;
+- quarantine of generated logic pending physical test evidence;
+- immutable adapter, script, artifact, and library identities;
+- signed chunked artifact transfer to Core;
+- remote CYD approval leases;
+- STOP assertion and controlled resume;
+- three-C5 safety-quorum readiness checks;
+- optional Vision capture and structured verification;
+- tamper-evident hash-chained audit logging;
+- CLI, authenticated HTTP API, deterministic tests, and real-hardware contract tests.
+
+## Supported bundled Flipper operations
+
+Bundled adapters map to official Flipper RPC concepts rather than free-form commands:
+
+```text
+system_device_info
+system_power_info
+storage_info
+storage_list
+storage_stat
+app_start
+app_exit
+app_load_file
+gui_input
+gpio_read
+property_get
+artifact_stage
+```
+
+Application-specific functions must have a typed adapter. Codex may generate a candidate adapter or script, but the generated material is stored as `staged_pending_review` and is not executable. An operator must physically test it, preserve the test evidence, and promote the exact generated SHA-256 with the evidence SHA-256. Generated adapter execution is disabled by default even after promotion and must be explicitly enabled with `S1R3N_ALLOW_GENERATED_ADAPTER_EXECUTION=true`.
 
 ## Requirements
 
-- Node.js 20.11 or newer
-- An OpenAI API key for natural-language planning or adapter/script generation
-- No npm runtime dependencies are required
-- A Core control-plane endpoint for physical execution
-- A random control key at least 32 characters long
-- An API bearer token for the HTTP service
+- Node.js 20.11 or newer; CI uses Node.js 24
+- a real Core endpoint implementing the signed response contract
+- a CYD Deck online and attested as `deck-cyd`
+- a Flipper online through the CYD only
+- all three ESP32-C5 safety nodes online and healthy
+- an OpenAI API key
+- independent API and control secrets
+- production firmware and physical acceptance evidence
 
-## Setup
+## Configuration
+
+Copy the environment template and set real values. Placeholder values are rejected.
 
 ```bash
 cd m3rma1d-s1r3n/codex
 cp .env.example .env
-# Export values from .env in your shell. The service intentionally does not parse secrets from source files.
+```
+
+Export the values through the process manager or shell. The service does not load `.env` files automatically.
+
+Required:
+
+```text
+OPENAI_API_KEY
+S1R3N_API_TOKEN          at least 32 characters
+S1R3N_CORE_URL           HTTPS by default
+S1R3N_CONTROL_KEY        at least 32 characters
+```
+
+Optional:
+
+```text
+OPENAI_MODEL
+S1R3N_STATE_DIR
+S1R3N_REGION_PROFILE
+S1R3N_VISION_URL
+S1R3N_ALLOW_NETWORK_ARTIFACTS
+S1R3N_ALLOW_GENERATED_ADAPTER_EXECUTION
+S1R3N_ALLOW_INSECURE_LOCAL_HTTP
+```
+
+`S1R3N_ALLOW_INSECURE_LOCAL_HTTP=true` is accepted only for private or local addresses and exists for controlled commissioning. Production deployments should terminate TLS at or before Core.
+
+## Deterministic gates
+
+```bash
 npm test
 npm run check
 ```
 
-Start in dry-run mode first:
+`npm test` runs pure deterministic unit and contract tests. It does not impersonate hardware. `npm run check` rejects development substitutes, raw command operations, missing adapters, mutable library pins, incorrect routing, and other release-policy violations.
+
+## Real-hardware contract
+
+The hardware suite connects to the real Core and checks its signed responses:
 
 ```bash
-export OPENAI_API_KEY="..."
-export S1R3N_API_TOKEN="use-a-long-random-token"
-export S1R3N_DRY_RUN=true
-npm start
+export S1R3N_CORE_URL="https://core-host-or-address"
+export S1R3N_CONTROL_KEY="32-or-more-random-characters"
+npm run test:hardware
 ```
 
-The OpenAI key remains on this host. It is never compiled into an ESP32 or sent to the Core, Deck, C5 nodes, Vision board, or Flipper.
+By default it verifies:
+
+- Core signed response integrity;
+- `deck-cyd` as physical owner;
+- no fallback route;
+- CYD online;
+- Flipper online;
+- all three C5 safety nodes online and healthy;
+- real Flipper inventory returned through the CYD.
+
+The optional read-only device-information execution is disabled unless deliberately enabled after STOP is cleared:
+
+```bash
+export S1R3N_HARDWARE_TEST_EXECUTE_READONLY=true
+npm run test:hardware
+```
+
+No transmit operation is part of the hardware contract.
 
 ## CLI
 
-Plan a run without executing it:
+Readiness:
+
+```bash
+node src/cli.mjs readiness
+```
+
+Refresh real Flipper inventory:
+
+```bash
+node src/cli.mjs inventory --refresh
+```
+
+Plan a task:
 
 ```bash
 node src/cli.mjs plan \
-  --task "List installed apps and report storage" \
+  --task "Read device and external-storage information" \
   --asset flipper-001 \
-  --purpose "inventory my test Flipper"
+  --purpose "inventory an owned test Flipper" \
+  --operator operator-001
 ```
 
-Preview a checked-in ADL file after resolution and materialization:
+Preview a checked ADL file without executing it:
 
 ```bash
 node src/cli.mjs preview --file examples/read-only-run.json
 ```
 
-Dry-run it:
+Execute only after host and remote STOP states have been intentionally cleared and readiness passes:
 
 ```bash
 node src/cli.mjs run --file examples/read-only-run.json
@@ -93,28 +187,46 @@ node src/cli.mjs run --file examples/read-only-run.json
 Assert STOP:
 
 ```bash
-node src/cli.mjs stop --reason "bench wiring change"
+node src/cli.mjs stop --reason "operator stop"
 ```
 
-A physical resume requires the Deck online and the C5 safety mesh healthy:
+Resume:
 
 ```bash
-node src/cli.mjs resume --confirm RESUME --reason "bench verified"
+node src/cli.mjs resume --confirm RESUME --reason "physical system inspected"
 ```
 
-Register an exact frequency for an operator-owned lab asset. This does not authorize use against any other device:
+Stage a real local artifact:
 
 ```bash
-node src/cli.mjs register-asset \
-  --asset gate-remote-lab \
-  --source "owner equipment record 2026-09-01" \
-  --profile subghz.transmit.user_defined \
-  --frequency 315000000
+node src/cli.mjs stage-artifact \
+  --id owned-artifact-001 \
+  --kind config \
+  --file /absolute/path/to/file \
+  --sha256 <expected-sha256>
+```
+
+Promote a physically tested generated adapter:
+
+```bash
+node src/cli.mjs promote-adapter \
+  --adapter app.function \
+  --operator operator-001 \
+  --evidence-sha256 <sha256-of-test-evidence>
+```
+
+Promote a physically tested generated script:
+
+```bash
+node src/cli.mjs promote-script \
+  --script workflow-id \
+  --operator operator-001 \
+  --evidence-sha256 <sha256-of-test-evidence>
 ```
 
 ## HTTP API
 
-All `/v1/*` endpoints require:
+All endpoints except `GET /health` require:
 
 ```text
 Authorization: Bearer $S1R3N_API_TOKEN
@@ -124,6 +236,7 @@ Endpoints:
 
 ```text
 GET  /health
+GET  /ready
 GET  /v1/status
 GET  /v1/catalog
 GET  /v1/audit/verify
@@ -134,61 +247,18 @@ POST /v1/stop
 POST /v1/resume
 POST /v1/inventory/refresh
 POST /v1/assets
+POST /v1/adapters/promote
+POST /v1/scripts/promote
 ```
 
-Example plan request:
+Start the service only after configuration and deterministic gates pass:
 
 ```bash
-curl -sS http://127.0.0.1:9183/v1/plan \
-  -H "Authorization: Bearer $S1R3N_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  --data @examples/task-request.json
-```
-
-## Physical mode
-
-After dry-run tests pass:
-
-```bash
-export S1R3N_DRY_RUN=false
-export S1R3N_CORE_URL="http://<core-ip>:9184"
-export S1R3N_CONTROL_KEY="<32-or-more-random-characters>"
-export S1R3N_APPROVAL_MODE=deck
 npm start
 ```
 
-Each Core request is wrapped in a signed envelope containing a timestamp, nonce, logical target, physical owner, and `fallback_physical_route=false`. The Core must independently verify the signature, freshness, nonce replay state, STOP state, C5 safety mesh, Deck identity, ADL lease, and per-step approval before forwarding to the CYD.
+On SIGINT or SIGTERM, the service attempts to assert remote STOP before closing.
 
-## Generated adapters and scripts
+## Release boundary
 
-Generated material is written under `state/artifacts/` and indexed by SHA-256. Generated content is not committed automatically. Review it, run its test plan, and promote it into `catalog/adapters.json` only after physical verification.
-
-Adapters use typed operations such as:
-
-```text
-loader_list
-loader_info
-loader_open
-loader_close
-named_cli
-input_key
-wait_ms
-artifact_stage
-expect
-capture_vision
-deck_confirm
-```
-
-There is no operation for raw shell, raw CLI, arbitrary code execution, jamming, brute force, credential extraction, or access-control bypass.
-
-## Verification
-
-```bash
-npm test
-npm run check
-node src/cli.mjs audit-verify
-```
-
-Host tests cover Structured Output request formation, generated-adapter validation, artifact staging, asset-gated frequency resolution, HMAC transport routing, audit-chain verification, and an end-to-end Deck-only dry run.
-
-Physical functions remain `NOT TESTED` until the actual Core, Vision, CYD, three C5 nodes, and Flipper are flashed, wired, and exercised according to `../docs/WIRING.md`.
+This host code is not evidence that the assembled appliance is user-ready. A production release requires passing `../PRODUCTION_READINESS.md`, including reproducible firmware builds and recorded physical tests for Core, Vision, three C5 nodes, CYD, Flipper Expansion RPC, UART wiring, touchscreen approval/STOP, replay rejection, quorum loss, and power-failure recovery.
