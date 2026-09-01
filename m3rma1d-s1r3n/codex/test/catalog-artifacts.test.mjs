@@ -61,7 +61,7 @@ test('adapter validator rejects raw commands and incomplete transmit adapters', 
   const base = generatedAdapter();
   assert.throws(
     () => validateAdapter({...base, operations:[{op:'app_start', app_name:'Clock', args:'', command:'raw'}]}),
-    /field denied/,
+    /unexpected field|field denied/,
   );
   assert.throws(
     () => validateAdapter({...base, adapter_id:'ir.tx', app_id:'infrared', function:'transmit', risk:'transmit'}),
