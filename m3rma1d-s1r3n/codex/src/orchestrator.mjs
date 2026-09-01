@@ -155,10 +155,30 @@ export class MermaidCodexService {
         transport: async (job, deadline) => {
           await this.assertReady({requireStopCleared: true});
           const materialized = await this.materializer.materialize(job);
-          state.status = 'executing';
+          state.status = 'staging';
           state.current_job = materialized.job_id;
           await atomicWriteJson(statePath, state);
 
+          for (const artifact of materialized.flipper_program.artifacts) {
+            const {metadata, bytes} = await this.artifacts.readArtifactBytes(artifact.id);
+            invariant(metadata.sha256 === artifact.sha256 && metadata.size === artifact.size,
+              `materialized artifact changed before transfer: ${artifact.id}`);
+            await this.audit.write({
+              event: 'artifact.transfer.started',
+              job_id: materialized.job_id,
+              artifact: {id: metadata.id, kind: metadata.kind, sha256: metadata.sha256, size: metadata.size},
+            });
+            const staged = await this.transport.stageArtifact({
+              id: metadata.id,
+              kind: metadata.kind,
+              sha256: metadata.sha256,
+              bytes,
+            }, deadline);
+            await this.audit.write({event: 'artifact.transfer.completed', job_id: materialized.job_id, artifact: staged});
+          }
+
+          state.status = 'executing';
+          await atomicWriteJson(statePath, state);
           let result = await this.transport.execute(materialized, deadline);
           invariant(result?.job_id === materialized.job_id, 'Core result job mismatch');
           invariant(Number.isInteger(result?.code), 'Core result code missing');
