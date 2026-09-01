@@ -12,7 +12,7 @@
     "cli": "node --enable-source-maps src/cli.mjs",
     "check": "node src/check.mjs",
     "test": "node --test",
-    "test:hardware": "node --test test/hardware-contract.test.mjs",
+    "test:hardware": "node --test test/hardware-contract.contract.mjs",
     "readiness": "node src/cli.mjs readiness"
   }
 }
