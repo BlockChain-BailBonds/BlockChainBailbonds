@@ -1,14 +1,26 @@
 {
-  "library_catalog_version":"1.0",
+  "library_catalog_version": "2.0",
   "libraries": {
-    "flipper.official.firmware-api": {
-      "id":"flipper.official.firmware-api",
-      "source_type":"git",
-      "url":"https://github.com/flipperdevices/flipperzero-firmware",
-      "revision":"2d8711939ac8442a572219ed0fb4beaa02a89858",
-      "sha256":"revision:2d8711939ac8442a572219ed0fb4beaa02a89858",
-      "license":"GPL-3.0-or-later",
-      "trusted":true
+    "flipper.official.protobuf": {
+      "id": "flipper.official.protobuf",
+      "source_type": "git",
+      "url": "https://github.com/flipperdevices/flipperzero-protobuf",
+      "revision": "1c84fa48919cbb71d1cc65236fc0ee36740e24c6",
+      "sha256": "66ec3f8bc54a2187fbae6b128d8242946ddb830fcad6cb4213ec3381057aa692",
+      "hash_scope": "source_descriptor",
+      "license": "BSD-3-Clause",
+      "trusted": true
+    },
+    "flipper.official.expansion-protocol": {
+      "id": "flipper.official.expansion-protocol",
+      "source_type": "git",
+      "url": "https://github.com/flipperdevices/flipperzero-firmware",
+      "revision": "2d8711939ac8442a572219ed0fb4beaa02a89858",
+      "path": "applications/services/expansion/expansion_protocol.h",
+      "sha256": "56216f9948647f6b365c6359a377750f1430bbbe6b41b41ee2455e9e363f3b59",
+      "hash_scope": "source_descriptor",
+      "license": "Unlicense",
+      "trusted": true
     }
   }
 }
