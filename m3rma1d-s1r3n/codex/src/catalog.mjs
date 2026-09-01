@@ -9,8 +9,29 @@ const ALLOWED_ADAPTER_OPS = new Set([
   'gui_input', 'gpio_read', 'property_get',
   'wait_ms', 'artifact_stage', 'expect', 'capture_vision', 'deck_confirm',
 ]);
+const OPERATION_FIELDS = Object.freeze({
+  system_device_info: new Set(['op']),
+  system_power_info: new Set(['op']),
+  storage_info: new Set(['op', 'path']),
+  storage_list: new Set(['op', 'path']),
+  storage_stat: new Set(['op', 'path']),
+  storage_write: new Set(['op', 'artifact_id', 'destination_path']),
+  app_start: new Set(['op', 'app_name', 'args']),
+  app_exit: new Set(['op']),
+  app_load_file: new Set(['op', 'path']),
+  app_button: new Set(['op', 'index', 'args']),
+  gui_input: new Set(['op', 'key', 'press']),
+  gpio_read: new Set(['op', 'pin']),
+  property_get: new Set(['op', 'property_key']),
+  wait_ms: new Set(['op', 'ms']),
+  artifact_stage: new Set(['op', 'artifact_id', 'destination_path']),
+  expect: new Set(['op', 'expectation']),
+  capture_vision: new Set(['op']),
+  deck_confirm: new Set(['op']),
+});
 const DENIED_KEYS = new Set(['raw_command', 'command', 'shell', 'exec', 'code', 'payload_bytes', 'template']);
 const DENIED_TEXT = /(raw[_ -]?cli|shell|exec\s*\(|jamm|brute.?force|credential.?dump|access.?bypass)/i;
+const PLACEHOLDER = /^\$\{([A-Za-z0-9_]+)\}$/;
 const ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const RISKS = ['observe', 'local_state', 'physical_output', 'transmit', 'restricted'];
@@ -27,45 +48,107 @@ function requireString(value, name, max = 256) {
   invariant(typeof value === 'string' && value.length > 0 && value.length <= max, `${name} is invalid`);
 }
 
-function validateOperation(operation) {
+function placeholderProperty(value, argumentsSchema, name) {
+  if (typeof value !== 'string') return null;
+  const match = PLACEHOLDER.exec(value);
+  if (!match) {
+    invariant(!value.includes('${'), `${name} contains partial interpolation`);
+    return null;
+  }
+  const property = argumentsSchema?.properties?.[match[1]];
+  invariant(property && typeof property === 'object', `${name} references undeclared argument ${match[1]}`);
+  return {name: match[1], schema: property};
+}
+
+function validateStringOrPlaceholder(value, name, max, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    requireString(value, name, max);
+    return;
+  }
+  invariant(placeholder.schema.type === 'string', `${name} placeholder must reference a string argument`);
+  if (placeholder.schema.maxLength !== undefined) {
+    invariant(placeholder.schema.maxLength <= max, `${name} placeholder maximum exceeds operation limit`);
+  }
+}
+
+function validateEnumOrPlaceholder(value, allowed, name, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    invariant(allowed.includes(value), `invalid ${name}`);
+    return;
+  }
+  invariant(placeholder.schema.type === 'string', `${name} placeholder must reference a string argument`);
+  invariant(Array.isArray(placeholder.schema.enum) && placeholder.schema.enum.length > 0,
+    `${name} placeholder argument must define an enum`);
+  invariant(placeholder.schema.enum.every((entry) => allowed.includes(entry)),
+    `${name} placeholder enum exceeds the operation allowlist`);
+}
+
+function validateIntegerOrPlaceholder(value, name, min, max, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    invariant(Number.isInteger(value) && value >= min && value <= max, `invalid ${name}`);
+    return;
+  }
+  invariant(placeholder.schema.type === 'integer', `${name} placeholder must reference an integer argument`);
+  invariant((placeholder.schema.minimum ?? min) >= min, `${name} placeholder minimum is unsafe`);
+  invariant((placeholder.schema.maximum ?? max) <= max, `${name} placeholder maximum is unsafe`);
+}
+
+function validateOperation(operation, argumentsSchema = {}) {
   invariant(operation && typeof operation === 'object' && !Array.isArray(operation), 'invalid adapter operation');
   invariant(ALLOWED_ADAPTER_OPS.has(operation.op), `adapter operation denied: ${operation.op}`);
+  const allowedFields = OPERATION_FIELDS[operation.op];
+  invariant(allowedFields, `operation field policy missing: ${operation.op}`);
+  for (const key of Object.keys(operation)) invariant(allowedFields.has(key), `unexpected field ${key} for ${operation.op}`);
+
   switch (operation.op) {
     case 'storage_info':
     case 'storage_list':
     case 'storage_stat':
     case 'app_load_file':
-      requireString(operation.path, `${operation.op}.path`, 255);
+      validateStringOrPlaceholder(operation.path, `${operation.op}.path`, 255, argumentsSchema);
       break;
     case 'storage_write':
     case 'artifact_stage':
-      requireString(operation.artifact_id, `${operation.op}.artifact_id`, 96);
-      requireString(operation.destination_path, `${operation.op}.destination_path`, 255);
+      validateStringOrPlaceholder(operation.artifact_id, `${operation.op}.artifact_id`, 96, argumentsSchema);
+      validateStringOrPlaceholder(operation.destination_path, `${operation.op}.destination_path`, 255, argumentsSchema);
       break;
     case 'app_start':
-      requireString(operation.app_name, 'app_start.app_name', 64);
-      if (operation.args !== undefined) invariant(typeof operation.args === 'string' && operation.args.length <= 256, 'app_start.args is invalid');
+      validateStringOrPlaceholder(operation.app_name, 'app_start.app_name', 64, argumentsSchema);
+      if (operation.args !== undefined) {
+        const placeholder = placeholderProperty(operation.args, argumentsSchema, 'app_start.args');
+        if (placeholder) {
+          invariant(placeholder.schema.type === 'string', 'app_start.args placeholder must reference a string argument');
+          invariant((placeholder.schema.maxLength ?? 256) <= 256, 'app_start.args placeholder maximum exceeds limit');
+        } else {
+          invariant(typeof operation.args === 'string' && operation.args.length <= 256, 'app_start.args is invalid');
+        }
+      }
       break;
     case 'app_button':
-      invariant((Number.isInteger(operation.index) && operation.index >= 0) ||
-        (typeof operation.args === 'string' && operation.args.length > 0 && operation.args.length <= 128),
-      'app_button requires a non-negative index or bounded args');
+      if (operation.index !== undefined) {
+        validateIntegerOrPlaceholder(operation.index, 'app_button.index', 0, 2147483647, argumentsSchema);
+      } else {
+        validateStringOrPlaceholder(operation.args, 'app_button.args', 128, argumentsSchema);
+      }
       break;
     case 'gui_input':
-      invariant(['up', 'down', 'right', 'left', 'ok', 'back'].includes(operation.key), 'invalid gui_input key');
-      invariant(['press', 'release', 'short', 'long'].includes(operation.press), 'invalid gui_input press type');
+      validateEnumOrPlaceholder(operation.key, ['up', 'down', 'right', 'left', 'ok', 'back'], 'gui_input.key', argumentsSchema);
+      validateEnumOrPlaceholder(operation.press, ['press', 'release', 'short', 'long'], 'gui_input.press', argumentsSchema);
       break;
     case 'gpio_read':
-      invariant(['PC0', 'PC1', 'PC3', 'PB2', 'PB3', 'PA4', 'PA6', 'PA7'].includes(operation.pin), 'invalid Flipper GPIO pin');
+      validateEnumOrPlaceholder(operation.pin, ['PC0', 'PC1', 'PC3', 'PB2', 'PB3', 'PA4', 'PA6', 'PA7'], 'gpio_read.pin', argumentsSchema);
       break;
     case 'property_get':
-      requireString(operation.property_key, 'property_get.property_key', 128);
+      validateStringOrPlaceholder(operation.property_key, 'property_get.property_key', 128, argumentsSchema);
       break;
     case 'wait_ms':
-      invariant(Number.isInteger(operation.ms) && operation.ms > 0 && operation.ms <= 10000, 'invalid wait_ms');
+      validateIntegerOrPlaceholder(operation.ms, 'wait_ms.ms', 1, 10000, argumentsSchema);
       break;
     case 'expect':
-      requireString(operation.expectation, 'expect.expectation', 256);
+      validateStringOrPlaceholder(operation.expectation, 'expect.expectation', 256, argumentsSchema);
       break;
     default:
       break;
@@ -80,7 +163,11 @@ export function validateAdapter(adapter) {
   invariant(RISKS.includes(adapter.risk), 'invalid adapter risk');
   invariant(Array.isArray(adapter.operations) && adapter.operations.length > 0 && adapter.operations.length <= 128, 'invalid adapter operations');
   invariant(Array.isArray(adapter.test_plan) && adapter.test_plan.length > 0 && adapter.test_plan.length <= 16, 'adapter test plan required');
-  adapter.operations.forEach(validateOperation);
+  const argumentsSchema = adapter.arguments_schema ?? {type: 'object', additionalProperties: false, required: [], properties: {}};
+  invariant(argumentsSchema.type === 'object', 'arguments_schema must describe an object');
+  invariant(argumentsSchema.properties && typeof argumentsSchema.properties === 'object' && !Array.isArray(argumentsSchema.properties),
+    'arguments_schema.properties is required');
+  adapter.operations.forEach((operation) => validateOperation(operation, argumentsSchema));
 
   walk(adapter, (value, key) => {
     invariant(!DENIED_KEYS.has(key), `adapter field denied: ${key}`);
@@ -240,12 +327,12 @@ export class CatalogService {
       capabilities: this.catalog.capabilities,
       apps: this.catalog.apps,
       installed_apps: inventory?.flipper?.apps ?? [],
-      adapters: Object.fromEntries(Object.entries(this.adapters).map(([id, adapter]) => [id, {
+      adapters: Object.fromEntries(Object.entries(this.adapters).map(([adapterId, adapter]) => [adapterId, {
         sha256: adapter.sha256,
         origin: adapter.origin,
         verification_status: adapter.verification_status,
       }])),
-      scripts: Object.fromEntries(Object.entries(this.scripts).map(([id, script]) => [id, {
+      scripts: Object.fromEntries(Object.entries(this.scripts).map(([scriptId, script]) => [scriptId, {
         sha256: script.sha256 ?? null,
         origin: script.origin ?? 'bundled',
         verification_status: script.verification_status ?? 'bundled_verified',
