@@ -1,4 +1,4 @@
-import {createHmac, randomBytes} from 'node:crypto';
+import {createHash, createHmac, randomBytes} from 'node:crypto';
 import {constantTimeEqual, invariant, nowIso, stableJson, withTimeout} from './utils.mjs';
 
 const ROUTE = Object.freeze({
@@ -6,6 +6,7 @@ const ROUTE = Object.freeze({
   physical_owner: 'deck-cyd',
   fallback_physical_route: false,
 });
+const SHA256 = /^[a-f0-9]{64}$/;
 
 function unsignedEnvelope(envelope) {
   const copy = {...envelope};
@@ -54,7 +55,7 @@ export function verifyResponseEnvelope(envelope, requestEnvelope, key, clockSkew
   validateRoute(envelope.route);
   const timestamp = Date.parse(envelope.timestamp);
   invariant(Number.isFinite(timestamp) && Math.abs(Date.now() - timestamp) <= clockSkewMs, 'Core response is stale');
-  invariant(/^[a-f0-9]{64}$/.test(envelope.signature ?? ''), 'Core response signature is malformed');
+  invariant(SHA256.test(envelope.signature ?? ''), 'Core response signature is malformed');
   invariant(constantTimeEqual(envelope.signature, signEnvelope(envelope, key)), 'Core response signature is invalid');
   invariant(envelope.payload && typeof envelope.payload === 'object' && !Array.isArray(envelope.payload), 'Core response payload is invalid');
   return envelope.payload;
@@ -120,7 +121,47 @@ export class HttpCoreTransport {
     invariant(job?.route?.physical_owner === 'deck-cyd' && job.route?.fallback_physical_route === false,
       'job route must be Deck-only');
     invariant(job?.flipper_program?.version === 1, 'materialized Flipper program is required');
+    invariant(SHA256.test(job.flipper_program.sha256 ?? ''), 'Flipper program digest is missing');
     return this.send('/v1/jobs', 'job.execute', job, deadline);
+  }
+
+  async stageArtifact({id, kind, sha256, bytes}, deadline) {
+    invariant(/^[A-Za-z0-9._:-]{1,64}$/.test(id), 'artifact transfer ID is invalid');
+    invariant(typeof kind === 'string' && kind.length > 0, 'artifact transfer kind is invalid');
+    invariant(SHA256.test(sha256 ?? ''), 'artifact transfer SHA-256 is invalid');
+    invariant(Buffer.isBuffer(bytes) && bytes.length > 0, 'artifact transfer bytes are required');
+    invariant(createHash('sha256').update(bytes).digest('hex') === sha256, 'artifact transfer bytes do not match SHA-256');
+
+    const begin = await this.send('/v1/artifacts/begin', 'artifact.begin', {
+      id, kind, sha256, size: bytes.length, requested_chunk_size: 4096,
+    }, deadline);
+    invariant(/^[A-Za-z0-9._:-]{8,128}$/.test(begin?.upload_id ?? ''), 'Core did not return a valid artifact upload ID');
+    const chunkSize = Number.isInteger(begin.chunk_size) ? begin.chunk_size : 4096;
+    invariant(chunkSize >= 256 && chunkSize <= 16384, 'Core returned an unsafe artifact chunk size');
+
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const chunk = bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize));
+      const chunkSha256 = createHash('sha256').update(chunk).digest('hex');
+      const response = await this.send('/v1/artifacts/chunk', 'artifact.chunk', {
+        upload_id: begin.upload_id,
+        id,
+        offset,
+        data_base64: chunk.toString('base64'),
+        chunk_sha256: chunkSha256,
+      }, deadline);
+      invariant(response?.upload_id === begin.upload_id && response?.next_offset === offset + chunk.length,
+        `Core artifact upload offset mismatch for ${id}`);
+    }
+
+    const committed = await this.send('/v1/artifacts/commit', 'artifact.commit', {
+      upload_id: begin.upload_id,
+      id,
+      sha256,
+      size: bytes.length,
+    }, deadline);
+    invariant(committed?.id === id && committed?.sha256 === sha256 && committed?.staged === true,
+      `Core did not confirm artifact integrity for ${id}`);
+    return committed;
   }
 
   requestApproval(job, deadline) {
