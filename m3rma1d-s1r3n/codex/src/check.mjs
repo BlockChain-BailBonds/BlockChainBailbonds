@@ -18,7 +18,7 @@ const required = [
 ];
 for (const relative of required) await readFile(path.join(root, relative));
 
-const defaults = await readJson(path.join(root, 'config/default.json'));
+const defaults = await readJson(path.join(root, 'config', 'default.json'));
 if (Object.hasOwn(defaults.execution, 'dry_run')) throw new Error('production defaults must not contain dry_run');
 if (defaults.execution.physical_owner !== 'deck-cyd' || defaults.execution.allow_fallback_physical_route !== false) {
   throw new Error('production route must be Deck-only with no fallback');
@@ -26,14 +26,14 @@ if (defaults.execution.physical_owner !== 'deck-cyd' || defaults.execution.allow
 if (defaults.transport.core_url !== '') throw new Error('production Core URL must be supplied by environment, not embedded defaults');
 if (defaults.transport.allow_insecure_local_http !== false) throw new Error('insecure local HTTP must default to false');
 
-const adapterCatalog = await readJson(path.join(root, 'catalog/adapters.json'));
+const adapterCatalog = await readJson(path.join(root, 'catalog', 'adapters.json'));
 const adapters = adapterCatalog.adapters ?? {};
 for (const [adapterId, adapter] of Object.entries(adapters)) {
   if (adapter.adapter_id !== adapterId) throw new Error(`adapter key mismatch: ${adapterId}`);
   validateAdapter(adapter);
 }
 
-const catalog = await readJson(path.join(root, 'catalog/catalog.json'));
+const catalog = await readJson(path.join(root, 'catalog', 'catalog.json'));
 for (const [name, capability] of Object.entries(catalog.capabilities ?? {})) {
   if (capability.operation !== 'adapter') throw new Error(`capability is not adapter-backed: ${name}`);
   if (!adapters[capability.adapter_id]) throw new Error(`capability adapter missing: ${name} -> ${capability.adapter_id}`);
@@ -45,7 +45,7 @@ for (const [appId, app] of Object.entries(catalog.apps ?? {})) {
   }
 }
 
-const libraries = (await readJson(path.join(root, 'catalog/libraries.json'))).libraries ?? {};
+const libraries = (await readJson(path.join(root, 'catalog', 'libraries.json'))).libraries ?? {};
 for (const [libraryId, library] of Object.entries(libraries)) {
   if (library.id !== libraryId) throw new Error(`library key mismatch: ${libraryId}`);
   if (library.source_type !== 'git' || !/^[a-f0-9]{40}$/.test(library.revision ?? '')) {
@@ -64,7 +64,7 @@ for (const [libraryId, library] of Object.entries(libraries)) {
 }
 
 const sourceDir = path.join(root, 'src');
-const sourceFiles = (await readdir(sourceDir)).filter((name) => name.endsWith('.mjs'));
+const sourceFiles = (await readdir(sourceDir)).filter((name) => name.endsWith('.mjs') && name !== 'check.mjs');
 const forbiddenRuntime = /(DryRunTransport|mock[-_ ]core|dry_run|MOCK CORE|simulated Flipper)/i;
 for (const name of sourceFiles) {
   const text = await readFile(path.join(sourceDir, name), 'utf8');
@@ -80,5 +80,28 @@ const route = await readJson(path.join(projectRoot, 'adl', 'hardware-routing.jso
 if (route.physical_owner !== 'deck-cyd' || route.fallback_physical_route !== false) {
   throw new Error('ADL hardware routing is not locked to the CYD Deck');
 }
+if (route.bridge?.deck_rx_gpio !== 22 || route.bridge?.deck_tx_gpio !== 27 ||
+    route.bridge?.flipper_tx_pin !== 13 || route.bridge?.flipper_rx_pin !== 14 ||
+    route.bridge?.power_connection !== false) {
+  throw new Error('ADL hardware routing does not match the approved CYD-to-Flipper wiring');
+}
 
-console.log(`M3rMa1d S1r3n production static checks passed: ${Object.keys(adapters).length} verified bundled adapters, ${Object.keys(libraries).length} pinned libraries`);
+const removedNonProductionFiles = [
+  path.join(projectRoot, 'platformio.ini'),
+  path.join(projectRoot, 'firmware', 'core-s3', 'src', 'main.cpp'),
+  path.join(projectRoot, 'firmware', 'deck-cyd', 'src', 'main.cpp'),
+  path.join(projectRoot, 'firmware', 'vision-s3cam', 'src', 'main.cpp'),
+  path.join(projectRoot, 'firmware', 'sentinel-c3', 'src', 'main.cpp'),
+  path.join(projectRoot, 'shared', 'protocol.hpp'),
+  path.join(projectRoot, 'shared', 'protocol.cpp'),
+];
+for (const file of removedNonProductionFiles) {
+  try {
+    await readFile(file);
+    throw new Error(`obsolete non-production firmware file remains: ${path.relative(projectRoot, file)}`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+console.log(`M3rMa1d S1r3n production static checks passed: ${Object.keys(adapters).length} verified bundled adapters, ${Object.keys(libraries).length} pinned libraries; obsolete firmware scaffolds absent`);
