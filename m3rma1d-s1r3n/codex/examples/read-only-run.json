@@ -1,15 +1,46 @@
 {
-  "adl_version":"2.0",
-  "run_id":"flipper-inventory-001",
-  "target":"flipper",
-  "description":"Read the attached Flipper inventory through the CYD bridge",
-  "max_run_ms":15000,
-  "stop_on_error":true,
-  "authorization":{"scope":"owned_asset","asset_id":"flipper-001","purpose":"inventory owned test device","region_profile":"US-LAB","operator_id":"local-operator"},
-  "resolution":{"source_policy":"official_and_pinned","allow_install":true,"allow_build":true,"allow_generate_script":true,"allow_generate_adapter":true,"allow_fetch_libraries":true,"allow_frequency_resolution":true,"auto_apply_read_only":true},
-  "steps":[
-    {"id":"device","kind":"capability","capability":"device_info","approval":"auto","timeout_ms":3000},
-    {"id":"storage","kind":"capability","capability":"storage_info","approval":"auto","timeout_ms":3000},
-    {"id":"apps","kind":"capability","capability":"loader_list","approval":"auto","timeout_ms":5000}
+  "adl_version": "2.0",
+  "run_id": "flipper-inventory-001",
+  "target": "flipper",
+  "description": "Read the attached Flipper device and external-storage inventory through the CYD bridge",
+  "max_run_ms": 15000,
+  "stop_on_error": true,
+  "authorization": {
+    "scope": "owned_asset",
+    "asset_id": "flipper-001",
+    "purpose": "inventory an owned test device",
+    "region_profile": "US-LAB",
+    "operator_id": "local-operator"
+  },
+  "resolution": {
+    "source_policy": "official_and_pinned",
+    "allow_generate_adapter": false,
+    "allow_generate_script": false,
+    "allow_frequency_resolution": true
+  },
+  "steps": [
+    {
+      "id": "device",
+      "kind": "capability",
+      "capability": "device_info",
+      "approval": "auto",
+      "timeout_ms": 3000
+    },
+    {
+      "id": "storage",
+      "kind": "capability",
+      "capability": "storage_info",
+      "arguments": {"path": "/ext"},
+      "approval": "auto",
+      "timeout_ms": 3000
+    },
+    {
+      "id": "apps",
+      "kind": "capability",
+      "capability": "storage_list",
+      "arguments": {"path": "/ext/apps"},
+      "approval": "auto",
+      "timeout_ms": 5000
+    }
   ]
 }
