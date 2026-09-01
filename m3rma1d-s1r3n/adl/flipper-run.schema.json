@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://918tech.example/m3rma1d-s1r3n/adl/flipper-run.schema.json",
-  "title": "M3rMa1d S1r3n ADL Universal Flipper Run",
+  "title": "M3rMa1d S1r3n ADL 2.0 Flipper Run",
   "type": "object",
   "additionalProperties": false,
   "required": ["adl_version", "run_id", "target", "authorization", "resolution", "steps"],
   "properties": {
     "adl_version": {"const": "2.0"},
-    "run_id": {"$ref": "#/$defs/id64"},
+    "run_id": {"$ref": "#/$defs/id"},
     "target": {"const": "flipper"},
     "description": {"type": "string", "maxLength": 512},
     "max_run_ms": {"type": "integer", "minimum": 100, "maximum": 600000, "default": 60000},
@@ -15,29 +15,25 @@
     "authorization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope", "asset_id", "purpose", "region_profile"],
+      "required": ["scope", "asset_id", "purpose", "region_profile", "operator_id"],
       "properties": {
         "scope": {"type": "string", "enum": ["owned_asset", "isolated_lab"]},
-        "asset_id": {"$ref": "#/$defs/id64"},
+        "asset_id": {"$ref": "#/$defs/id"},
         "purpose": {"type": "string", "minLength": 3, "maxLength": 256},
-        "region_profile": {"$ref": "#/$defs/id64"},
-        "expires_at": {"type": "string", "format": "date-time"},
-        "operator_id": {"$ref": "#/$defs/id64"}
+        "region_profile": {"$ref": "#/$defs/id"},
+        "operator_id": {"$ref": "#/$defs/id"},
+        "expires_at": {"type": "string", "format": "date-time"}
       }
     },
     "resolution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_policy"],
+      "required": ["source_policy", "allow_generate_adapter", "allow_generate_script", "allow_frequency_resolution"],
       "properties": {
         "source_policy": {"type": "string", "enum": ["local_only", "pinned_only", "official_and_pinned"]},
-        "allow_install": {"type": "boolean", "default": true},
-        "allow_build": {"type": "boolean", "default": true},
-        "allow_generate_script": {"type": "boolean", "default": true},
-        "allow_generate_adapter": {"type": "boolean", "default": true},
-        "allow_fetch_libraries": {"type": "boolean", "default": true},
-        "allow_frequency_resolution": {"type": "boolean", "default": true},
-        "auto_apply_read_only": {"type": "boolean", "default": true}
+        "allow_generate_adapter": {"type": "boolean"},
+        "allow_generate_script": {"type": "boolean"},
+        "allow_frequency_resolution": {"type": "boolean"}
       }
     },
     "steps": {
@@ -48,39 +44,29 @@
     }
   },
   "$defs": {
-    "id64": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 64,
-      "pattern": "^[A-Za-z0-9._:-]+$"
-    },
+    "id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$"},
     "step": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "kind"],
       "properties": {
-        "id": {"$ref": "#/$defs/id64"},
+        "id": {"$ref": "#/$defs/id"},
         "kind": {"type": "string", "enum": ["capability", "app", "script"]},
-        "capability": {"$ref": "#/$defs/id64"},
-        "app_id": {"$ref": "#/$defs/id64"},
-        "function": {"$ref": "#/$defs/id64"},
-        "script_id": {"$ref": "#/$defs/id64"},
+        "capability": {"$ref": "#/$defs/id"},
+        "app_id": {"$ref": "#/$defs/id"},
+        "function": {"$ref": "#/$defs/id"},
+        "script_id": {"$ref": "#/$defs/id"},
         "script_requirement": {"type": "string", "minLength": 3, "maxLength": 512},
         "arguments": {"type": "object", "maxProperties": 32},
-        "library_refs": {
-          "type": "array",
-          "maxItems": 16,
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/id64"}
-        },
-        "frequency_profile": {"$ref": "#/$defs/id64"},
+        "library_refs": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "frequency_profile": {"$ref": "#/$defs/id"},
         "signal_requirement": {
           "type": "object",
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
             "mode": {"type": "string", "enum": ["receive", "transmit"]},
-            "source_artifact": {"type": "string", "maxLength": 160},
+            "source_artifact": {"$ref": "#/$defs/id"},
             "description": {"type": "string", "maxLength": 256}
           }
         },
@@ -89,18 +75,9 @@
         "on_error": {"type": "string", "enum": ["stop", "continue", "rollback"], "default": "stop"}
       },
       "allOf": [
-        {
-          "if": {"properties": {"kind": {"const": "capability"}}, "required": ["kind"]},
-          "then": {"required": ["capability"]}
-        },
-        {
-          "if": {"properties": {"kind": {"const": "app"}}, "required": ["kind"]},
-          "then": {"required": ["app_id", "function"]}
-        },
-        {
-          "if": {"properties": {"kind": {"const": "script"}}, "required": ["kind"]},
-          "then": {"anyOf": [{"required": ["script_id"]}, {"required": ["script_requirement"]}]}
-        }
+        {"if": {"properties": {"kind": {"const": "capability"}}, "required": ["kind"]}, "then": {"required": ["capability"]}},
+        {"if": {"properties": {"kind": {"const": "app"}}, "required": ["kind"]}, "then": {"required": ["app_id", "function"]}},
+        {"if": {"properties": {"kind": {"const": "script"}}, "required": ["kind"]}, "then": {"anyOf": [{"required": ["script_id"]}, {"required": ["script_requirement"]}]}}
       ]
     }
   }
