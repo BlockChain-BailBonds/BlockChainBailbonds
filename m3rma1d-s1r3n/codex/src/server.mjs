@@ -39,6 +39,12 @@ function authorized(request, config) {
   return constantTimeEqual(token, config.service.apiToken);
 }
 
+function requestErrorStatus(error) {
+  if (Number.isInteger(error.statusCode)) return error.statusCode;
+  if (/timeout|unavailable|offline|failed|stale|signature|connection|network|fetch/i.test(error.message)) return 503;
+  return 422;
+}
+
 const service = await createService();
 
 const server = http.createServer(async (request, response) => {
@@ -108,10 +114,21 @@ const server = http.createServer(async (request, response) => {
       });
       return json(response, 200, promoted);
     }
+    if (url.pathname === '/v1/scripts/promote') {
+      const promoted = await service.catalog.promoteGeneratedScript(body);
+      await service.audit.write({
+        event: 'script.promoted',
+        script_id: promoted.script_id,
+        sha256: promoted.sha256,
+        verified_by: promoted.verified_by,
+        test_evidence_sha256: promoted.test_evidence_sha256,
+      });
+      return json(response, 200, promoted);
+    }
     return json(response, 404, {error: 'not found'});
   } catch (error) {
-    const status = Number.isInteger(error.statusCode) ? error.statusCode : 400;
-    await service.audit.write({event: 'api.error', method: request.method, path: request.url, error: error.message}).catch(() => {});
+    const status = requestErrorStatus(error);
+    await service.audit.write({event: 'api.error', method: request.method, path: request.url, error: error.message, status}).catch(() => {});
     return json(response, status, {error: error.message, ...(error.readiness ? {readiness: error.readiness} : {})});
   }
 });
