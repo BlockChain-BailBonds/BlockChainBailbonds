@@ -61,6 +61,7 @@ Commands:
   stage-artifact --id ID --kind KIND --file PATH [--sha256 HEX]
   register-asset --asset ID --source "owner record" [--profile ID --frequency HZ]
   promote-adapter --adapter ID --operator ID --evidence-sha256 HEX
+  promote-script --script ID --operator ID --evidence-sha256 HEX
   audit-verify
 
 Required environment:
@@ -91,18 +92,16 @@ switch (command) {
     print(await service.planTask({task, authorization: authorization(args, service), runId: args['run-id']}));
     break;
   }
-  case 'preview': {
+  case 'preview':
     print(await service.previewAdl(await readJsonFile(required(args, 'file'))));
     break;
-  }
-  case 'run': {
+  case 'run':
     if (args.file) print(await service.runAdl(await readJsonFile(args.file)));
     else {
       const task = required(args, 'task');
       print(await service.runTask({task, authorization: authorization(args, service), runId: args['run-id']}));
     }
     break;
-  }
   case 'inventory':
     if (args.refresh !== true) throw new Error('production inventory requires --refresh');
     print(await service.inventory({refresh: true}));
@@ -145,6 +144,22 @@ switch (command) {
     await service.audit.write({
       event: 'adapter.promoted',
       adapter_id: promoted.adapter_id,
+      sha256: promoted.sha256,
+      verified_by: promoted.verified_by,
+      test_evidence_sha256: promoted.test_evidence_sha256,
+    });
+    print(promoted);
+    break;
+  }
+  case 'promote-script': {
+    const promoted = await service.catalog.promoteGeneratedScript({
+      scriptId: required(args, 'script'),
+      operatorId: required(args, 'operator'),
+      testEvidenceSha256: required(args, 'evidence-sha256'),
+    });
+    await service.audit.write({
+      event: 'script.promoted',
+      script_id: promoted.script_id,
       sha256: promoted.sha256,
       verified_by: promoted.verified_by,
       test_evidence_sha256: promoted.test_evidence_sha256,
