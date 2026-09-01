@@ -17,18 +17,27 @@ function parseArgs(argv) {
   return args;
 }
 
+function required(args, name) {
+  const value = args[name];
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`--${name} is required`);
+  return value.trim();
+}
+
 function authorization(args, service) {
   return {
     scope: args.scope ?? 'owned_asset',
-    asset_id: args.asset ?? 'lab-device',
-    purpose: args.purpose ?? args.task ?? 'authorized M3rMa1d S1r3n operation',
+    asset_id: required(args, 'asset'),
+    purpose: required(args, 'purpose'),
     region_profile: args.region ?? service.config.regionProfile,
-    operator_id: args.operator ?? 'local-operator',
+    operator_id: required(args, 'operator'),
+    ...(args.expires ? {expires_at: new Date(args.expires).toISOString()} : {}),
   };
 }
 
 async function readJsonFile(file) {
-  return JSON.parse(await readFile(file, 'utf8'));
+  const parsed = JSON.parse(await readFile(file, 'utf8'));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON file must contain an object');
+  return parsed;
 }
 
 function print(value) {
@@ -36,24 +45,31 @@ function print(value) {
 }
 
 function usage() {
-  console.log(`M3rMa1d S1r3n Codex
+  console.log(`M3rMa1d S1r3n Codex production CLI
 
 Commands:
-  plan --task "..." --asset ID [--scope owned_asset|isolated_lab]
+  readiness
+  plan --task "..." --asset ID --purpose "..." --operator ID [--scope owned_asset|isolated_lab]
   preview --file run.json
   run --file run.json
-  run --task "..." --asset ID
-  inventory [--refresh]
+  run --task "..." --asset ID --purpose "..." --operator ID
+  inventory --refresh
   catalog
   status
   stop [--reason "..."]
   resume --confirm RESUME [--reason "..."]
+  stage-artifact --id ID --kind KIND --file PATH [--sha256 HEX]
   register-asset --asset ID --source "owner record" [--profile ID --frequency HZ]
+  promote-adapter --adapter ID --operator ID --evidence-sha256 HEX
   audit-verify
 
-Environment:
-  OPENAI_API_KEY is required for plan and natural-language run.
-  S1R3N_DRY_RUN defaults true. Hardware runs require false plus S1R3N_CORE_URL and S1R3N_CONTROL_KEY.
+Required environment:
+  OPENAI_API_KEY
+  S1R3N_API_TOKEN
+  S1R3N_CORE_URL
+  S1R3N_CONTROL_KEY
+
+The CLI never substitutes a simulated Core or Flipper. Preview resolves and materializes without execution; run requires signed hardware readiness from the real Core, all three C5 safety nodes, the CYD Deck, and the Flipper.
 `);
 }
 
@@ -67,35 +83,36 @@ if (!command || command === 'help' || args.help) {
 const service = await createService();
 
 switch (command) {
+  case 'readiness':
+    print(await service.readiness({requireStopCleared: false}));
+    break;
   case 'plan': {
-    if (!args.task) throw new Error('--task is required');
-    print(await service.planTask({task: args.task, authorization: authorization(args, service), runId: args['run-id']}));
+    const task = required(args, 'task');
+    print(await service.planTask({task, authorization: authorization(args, service), runId: args['run-id']}));
     break;
   }
   case 'preview': {
-    if (!args.file) throw new Error('--file is required');
-    print(await service.previewAdl(await readJsonFile(args.file)));
+    print(await service.previewAdl(await readJsonFile(required(args, 'file'))));
     break;
   }
   case 'run': {
     if (args.file) print(await service.runAdl(await readJsonFile(args.file)));
     else {
-      if (!args.task) throw new Error('--task or --file is required');
-      print(await service.runTask({task: args.task, authorization: authorization(args, service), runId: args['run-id']}));
+      const task = required(args, 'task');
+      print(await service.runTask({task, authorization: authorization(args, service), runId: args['run-id']}));
     }
     break;
   }
   case 'inventory':
-    print(await service.inventory({refresh: args.refresh === true}));
+    if (args.refresh !== true) throw new Error('production inventory requires --refresh');
+    print(await service.inventory({refresh: true}));
     break;
   case 'catalog':
     print(await service.catalog.snapshot());
     break;
-  case 'status': {
-    const [stop, control] = await Promise.all([service.stop.snapshot(), service.transport.status()]);
-    print({stop, control, dry_run: service.config.execution.dryRun});
+  case 'status':
+    print({...await service.readiness({requireStopCleared: false}), active_runs: service.activeRuns});
     break;
-  }
   case 'stop':
     print(await service.assertStop(args.reason ?? 'CLI stop'));
     break;
@@ -103,11 +120,36 @@ switch (command) {
     if (args.confirm !== 'RESUME') throw new Error('resume requires --confirm RESUME');
     print(await service.clearStop({authenticated: true, reason: args.reason ?? 'CLI resume'}));
     break;
+  case 'stage-artifact':
+    print(await service.artifacts.stageLocalFile({
+      id: required(args, 'id'),
+      kind: required(args, 'kind'),
+      filePath: required(args, 'file'),
+      expectedSha256: args.sha256,
+    }));
+    break;
   case 'register-asset': {
-    if (!args.asset || !args.source) throw new Error('--asset and --source are required');
+    const assetId = required(args, 'asset');
+    const source = required(args, 'source');
     const profiles = args.profile ? [args.profile] : [];
     const frequencies = args.profile && args.frequency ? {[args.profile]: Number(args.frequency)} : {};
-    print(await service.frequencies.registerOwnedAsset({assetId: args.asset, source: args.source, frequencyProfiles: profiles, frequencies}));
+    print(await service.frequencies.registerOwnedAsset({assetId, source, frequencyProfiles: profiles, frequencies}));
+    break;
+  }
+  case 'promote-adapter': {
+    const promoted = await service.catalog.promoteGeneratedAdapter({
+      adapterId: required(args, 'adapter'),
+      operatorId: required(args, 'operator'),
+      testEvidenceSha256: required(args, 'evidence-sha256'),
+    });
+    await service.audit.write({
+      event: 'adapter.promoted',
+      adapter_id: promoted.adapter_id,
+      sha256: promoted.sha256,
+      verified_by: promoted.verified_by,
+      test_evidence_sha256: promoted.test_evidence_sha256,
+    });
+    print(promoted);
     break;
   }
   case 'audit-verify':
