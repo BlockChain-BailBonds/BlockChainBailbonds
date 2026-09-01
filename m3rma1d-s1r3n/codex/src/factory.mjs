@@ -22,6 +22,7 @@ export async function createService({env = process.env, fetchImpl = globalThis.f
     allowNetwork: config.artifacts.allowNetwork,
     maxBytes: config.artifacts.maxBytes,
     allowedHosts: config.artifacts.allowedHosts,
+    fetchImpl,
   });
   const frequencies = new FrequencyResolver({packageRoot: config.packageRoot, stateDir: config.stateDir});
   const audit = new AuditLog({stateDir: config.stateDir});
