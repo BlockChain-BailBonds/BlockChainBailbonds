@@ -21,11 +21,12 @@ function generatedAdapter() {
     requires: {vision: true},
     arguments_schema: {type:'object', additionalProperties:false, required:[], properties:{}},
     operations: [
+      {op: 'deck_confirm'},
       {op: 'app_start', app_name: 'Clock', args: ''},
       {op: 'capture_vision'},
       {op: 'expect', expectation: 'Clock application is visible'},
     ],
-    test_plan: ['Open Clock and verify the display before promotion.'],
+    test_plan: ['Approve the exact adapter hash on the Deck, open Clock, and verify the display before promotion.'],
   };
 }
 
@@ -53,6 +54,7 @@ test('generated adapters remain non-executable until operator evidence promotes 
   const materialized = await enabled.materialize(job);
   assert.equal(materialized.flipper_program.adapter.verification_status, 'operator_verified');
   assert.match(materialized.flipper_program.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(materialized.flipper_program.operations[0].op, 'deck_confirm');
 });
 
 test('adapter validator rejects raw commands and incomplete transmit adapters', () => {
@@ -63,6 +65,6 @@ test('adapter validator rejects raw commands and incomplete transmit adapters', 
   );
   assert.throws(
     () => validateAdapter({...base, adapter_id:'ir.tx', app_id:'infrared', function:'transmit', risk:'transmit'}),
-    /deck_confirm|frequency profile/,
+    /frequency profile/,
   );
 });
