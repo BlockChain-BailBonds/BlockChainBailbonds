@@ -1,33 +1,54 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "M3rMa1d Declarative Script",
+  "$id": "https://918tech.example/m3rma1d-s1r3n/codex/schemas/script.schema.json",
+  "title": "M3rMa1d Declarative Adapter Script",
   "type": "object",
   "additionalProperties": false,
-  "required": ["script_version", "script_id", "description", "risk", "steps"],
+  "required": ["script_version", "script_id", "description", "risk", "steps", "test_plan"],
   "properties": {
     "script_version": {"const": "1.0"},
-    "script_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "script_id": {"$ref": "#/$defs/id"},
     "description": {"type": "string", "minLength": 3, "maxLength": 512},
     "risk": {"type": "string", "enum": ["observe", "local_state", "physical_output", "transmit", "restricted"]},
-    "inputs_schema": {"type": "object"},
     "steps": {
       "type": "array",
       "minItems": 1,
       "maxItems": 128,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "app_id", "function"],
-        "properties": {
-          "id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-          "app_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-          "function": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-          "arguments": {"type": "object", "maxProperties": 32},
-          "approval": {"type": "string", "enum": ["auto", "deck", "operator"]},
-          "frequency_profile": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
-          "artifact_refs": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"}},
-          "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000}
-        }
+      "items": {"$ref": "#/$defs/step"}
+    },
+    "test_plan": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {"type": "string", "minLength": 3, "maxLength": 256}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "app_id", "function"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "app_id": {"$ref": "#/$defs/id"},
+        "function": {"$ref": "#/$defs/id"},
+        "arguments": {"type": "object", "maxProperties": 32},
+        "approval": {"type": "string", "enum": ["auto", "deck", "operator"]},
+        "frequency_profile": {"$ref": "#/$defs/id"},
+        "signal_requirement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["receive", "transmit"]},
+            "source_artifact": {"$ref": "#/$defs/id"},
+            "description": {"type": "string", "maxLength": 256}
+          }
+        },
+        "library_refs": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
+        "on_error": {"type": "string", "enum": ["stop", "continue", "rollback"]}
       }
     }
   }
