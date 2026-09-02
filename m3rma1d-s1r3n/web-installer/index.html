@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M3rMa1d S1r3n Web Installer</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;background:#0b1020;color:#eef2ff}button,select{font:inherit;padding:12px 16px;margin:6px 0;border-radius:10px;border:0}button{cursor:pointer;background:#6366f1;color:white}pre{background:#111827;padding:16px;border-radius:12px;min-height:240px;white-space:pre-wrap}section{background:#151c30;padding:20px;border-radius:16px;margin:16px 0}.warn{color:#fbbf24}
+</style>
+</head>
+<body>
+<h1>M3rMa1d S1r3n Web Installer</h1>
+<p>Browser-based installer and serial console for the M3rMa1d S1r3n device stack, modeled after the simple Web Serial flow used by CLI-Esp32Marauder.</p>
+<section>
+<h2>1. Select device role</h2>
+<select id="role">
+<option value="core-s3">Core ESP32-S3 N16R8</option>
+<option value="vision-s3-ov3660">Vision ESP32-S3 N16R8 + OV3660</option>
+<option value="c5-guardian">ESP32-C5 Guardian</option>
+<option value="c5-watcher">ESP32-C5 Watcher</option>
+<option value="c5-arbiter">ESP32-C5 Arbiter</option>
+<option value="deck-cyd">ESP32-32E N4 CYD Deck</option>
+</select>
+<p class="warn">Flashing is intentionally unavailable until a verified release manifest with signed production firmware binaries exists. The installer will not substitute placeholder firmware.</p>
+<button id="connect">Connect to device</button>
+<button id="disconnect">Disconnect</button>
+</section>
+<section>
+<h2>2. Serial console</h2>
+<button id="status">Send status</button>
+<button id="info">Send device_info</button>
+<pre id="log">Waiting for connection...</pre>
+</section>
+<script>
+let port, reader, writer;
+const log = document.getElementById('log');
+function append(s){log.textContent += `\n${s}`;log.scrollTop=log.scrollHeight}
+async function connect(){
+  if(!('serial' in navigator)){append('Web Serial is not supported in this browser. Use Chrome/Edge on desktop.');return}
+  port = await navigator.serial.requestPort();
+  await port.open({baudRate:115200});
+  writer = port.writable.getWriter();
+  append('Connected.');
+  readLoop();
+}
+async function readLoop(){
+  const decoder = new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable).catch(()=>{});
+  reader = decoder.readable.getReader();
+  try{
+    while(true){const {value,done}=await reader.read();if(done)break;if(value)append(value)}
+  }catch(e){append(`Read error: ${e.message}`)}
+}
+async function send(line){
+  if(!writer){append('Not connected.');return}
+  const data = new TextEncoder().encode(line+'\r\n');
+  await writer.write(data);
+  append(`> ${line}`);
+}
+async function disconnect(){
+  try{if(reader){await reader.cancel();reader.releaseLock();reader=null}}catch{}
+  try{if(writer){writer.releaseLock();writer=null}}catch{}
+  try{if(port){await port.close();port=null}}catch{}
+  append('Disconnected.');
+}
+document.getElementById('connect').onclick=()=>connect().catch(e=>append(`Connect error: ${e.message}`));
+document.getElementById('disconnect').onclick=()=>disconnect();
+document.getElementById('status').onclick=()=>send('status');
+document.getElementById('info').onclick=()=>send('device_info');
+</script>
+</body>
+</html>
