@@ -1,0 +1,44 @@
+name: M3rMa1d S1r3n Flipper FAP
+
+on:
+  push:
+    branches:
+      - feat/m3rma1d-s1r3n-integrated-firmware
+    paths:
+      - 'm3rma1d-s1r3n/firmware/flipper-m3rma1d-s1r3n/**'
+      - '.github/workflows/m3rma1d-flipper-fap.yml'
+  pull_request:
+    paths:
+      - 'm3rma1d-s1r3n/firmware/flipper-m3rma1d-s1r3n/**'
+      - '.github/workflows/m3rma1d-flipper-fap.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.channel }} FAP
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [release, dev]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build M3rMa1d S1r3n with official uFBT action
+        id: build
+        uses: flipperdevices/flipperzero-ufbt-action@v0.1
+        with:
+          app-dir: m3rma1d-s1r3n/firmware/flipper-m3rma1d-s1r3n
+          sdk-channel: ${{ matrix.channel }}
+      - name: Upload FAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3rMa1d-S1r3n-${{ matrix.channel }}-${{ steps.build.outputs.suffix }}
+          path: ${{ steps.build.outputs.fap-artifacts }}
+          if-no-files-found: error
+      - name: Record build identity
+        shell: bash
+        run: |
+          echo "# M3rMa1d S1r3n FAP" >> "$GITHUB_STEP_SUMMARY"
+          echo "SDK channel: ${{ matrix.channel }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "API version: ${{ steps.build.outputs.api-version }}" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum ${{ steps.build.outputs.fap-artifacts }} | tee -a "$GITHUB_STEP_SUMMARY"
