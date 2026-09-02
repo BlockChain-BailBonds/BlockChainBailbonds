@@ -1,0 +1,70 @@
+name: M3rMa1d S1r3n Production Gates
+
+on:
+  push:
+    branches:
+      - main
+      - feat/m3rma1d-s1r3n-integrated-firmware
+    paths:
+      - 'm3rma1d-s1r3n/adl/**'
+      - 'm3rma1d-s1r3n/codex/**'
+      - '.github/workflows/m3rma1d-codex.yml'
+  pull_request:
+    paths:
+      - 'm3rma1d-s1r3n/adl/**'
+      - 'm3rma1d-s1r3n/codex/**'
+      - '.github/workflows/m3rma1d-codex.yml'
+  workflow_dispatch:
+    inputs:
+      run_hardware_contract:
+        description: 'Run the signed Core/C5/CYD/Flipper hardware contract on a labeled self-hosted runner'
+        required: true
+        type: boolean
+        default: false
+      execute_readonly:
+        description: 'Execute the real read-only device-info operation; STOP must already be intentionally cleared'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3rma1d-production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: m3rma1d-s1r3n/codex
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm test
+      - run: npm run check
+
+  hardware-contract:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_hardware_contract }}
+    runs-on: [self-hosted, linux, m3rma1d-hardware]
+    timeout-minutes: 15
+    environment: m3rma1d-hardware
+    defaults:
+      run:
+        working-directory: m3rma1d-s1r3n/codex
+    env:
+      S1R3N_CORE_URL: ${{ secrets.S1R3N_CORE_URL }}
+      S1R3N_CONTROL_KEY: ${{ secrets.S1R3N_CONTROL_KEY }}
+      S1R3N_ALLOW_INSECURE_LOCAL_HTTP: ${{ secrets.S1R3N_ALLOW_INSECURE_LOCAL_HTTP }}
+      S1R3N_HARDWARE_TEST_EXECUTE_READONLY: ${{ inputs.execute_readonly }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm run test:hardware

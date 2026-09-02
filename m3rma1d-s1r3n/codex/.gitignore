@@ -1,0 +1,5 @@
+.env
+state/*
+!state/.gitkeep
+*.log
+.DS_Store

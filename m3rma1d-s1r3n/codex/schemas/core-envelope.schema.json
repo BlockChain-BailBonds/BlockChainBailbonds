@@ -1,0 +1,16 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"M3rMa1d Core Control Envelope",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["version","type","timestamp","nonce","route","payload","signature"],
+  "properties":{
+    "version":{"const":1},
+    "type":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,64}$"},
+    "timestamp":{"type":"string","format":"date-time"},
+    "nonce":{"type":"string","pattern":"^[a-f0-9]{32}$"},
+    "route":{"type":"object","additionalProperties":false,"required":["logical_target","physical_owner","fallback_physical_route"],"properties":{"logical_target":{"const":"flipper"},"physical_owner":{"const":"deck-cyd"},"fallback_physical_route":{"const":false}}},
+    "payload":{"type":"object"},
+    "signature":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+  }
+}

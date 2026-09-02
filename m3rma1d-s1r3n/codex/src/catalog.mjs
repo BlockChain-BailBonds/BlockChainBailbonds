@@ -1,0 +1,496 @@
+import path from 'node:path';
+import {mkdir, readFile} from 'node:fs/promises';
+import {atomicWriteJson, invariant, readJson, sha256, stableJson} from './utils.mjs';
+
+const ALLOWED_ADAPTER_OPS = new Set([
+  'system_device_info', 'system_power_info',
+  'storage_info', 'storage_list', 'storage_stat', 'storage_write',
+  'app_start', 'app_exit', 'app_load_file', 'app_button',
+  'gui_input', 'gpio_read', 'property_get',
+  'wait_ms', 'artifact_stage', 'expect', 'capture_vision', 'deck_confirm',
+]);
+const OPERATION_FIELDS = Object.freeze({
+  system_device_info: new Set(['op']),
+  system_power_info: new Set(['op']),
+  storage_info: new Set(['op', 'path']),
+  storage_list: new Set(['op', 'path']),
+  storage_stat: new Set(['op', 'path']),
+  storage_write: new Set(['op', 'artifact_id', 'destination_path']),
+  app_start: new Set(['op', 'app_name', 'args']),
+  app_exit: new Set(['op']),
+  app_load_file: new Set(['op', 'path']),
+  app_button: new Set(['op', 'index', 'args']),
+  gui_input: new Set(['op', 'key', 'press']),
+  gpio_read: new Set(['op', 'pin']),
+  property_get: new Set(['op', 'property_key']),
+  wait_ms: new Set(['op', 'ms']),
+  artifact_stage: new Set(['op', 'artifact_id', 'destination_path']),
+  expect: new Set(['op', 'expectation']),
+  capture_vision: new Set(['op']),
+  deck_confirm: new Set(['op']),
+});
+const DENIED_KEYS = new Set(['raw_command', 'command', 'shell', 'exec', 'code', 'payload_bytes', 'template']);
+const DENIED_TEXT = /(raw[_ -]?cli|shell|exec\s*\(|jamm|brute.?force|credential.?dump|access.?bypass)/i;
+const PLACEHOLDER = /^\$\{([A-Za-z0-9_]+)\}$/;
+const ID = /^[A-Za-z0-9._:-]{1,64}$/;
+const SHA256 = /^[a-f0-9]{64}$/;
+const RISKS = ['observe', 'local_state', 'physical_output', 'transmit', 'restricted'];
+
+function walk(value, visitor, key = '') {
+  visitor(value, key);
+  if (Array.isArray(value)) value.forEach((item, index) => walk(item, visitor, `${key}[${index}]`));
+  else if (value && typeof value === 'object') {
+    for (const [childKey, child] of Object.entries(value)) walk(child, visitor, childKey);
+  }
+}
+
+function requireString(value, name, max = 256) {
+  invariant(typeof value === 'string' && value.length > 0 && value.length <= max, `${name} is invalid`);
+}
+
+function placeholderProperty(value, argumentsSchema, name) {
+  if (typeof value !== 'string') return null;
+  const match = PLACEHOLDER.exec(value);
+  if (!match) {
+    invariant(!value.includes('${'), `${name} contains partial interpolation`);
+    return null;
+  }
+  const property = argumentsSchema?.properties?.[match[1]];
+  invariant(property && typeof property === 'object', `${name} references undeclared argument ${match[1]}`);
+  return {name: match[1], schema: property};
+}
+
+function validateStringOrPlaceholder(value, name, max, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    requireString(value, name, max);
+    return;
+  }
+  invariant(placeholder.schema.type === 'string', `${name} placeholder must reference a string argument`);
+  if (placeholder.schema.maxLength !== undefined) {
+    invariant(placeholder.schema.maxLength <= max, `${name} placeholder maximum exceeds operation limit`);
+  }
+}
+
+function validateEnumOrPlaceholder(value, allowed, name, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    invariant(allowed.includes(value), `invalid ${name}`);
+    return;
+  }
+  invariant(placeholder.schema.type === 'string', `${name} placeholder must reference a string argument`);
+  invariant(Array.isArray(placeholder.schema.enum) && placeholder.schema.enum.length > 0,
+    `${name} placeholder argument must define an enum`);
+  invariant(placeholder.schema.enum.every((entry) => allowed.includes(entry)),
+    `${name} placeholder enum exceeds the operation allowlist`);
+}
+
+function validateIntegerOrPlaceholder(value, name, min, max, argumentsSchema) {
+  const placeholder = placeholderProperty(value, argumentsSchema, name);
+  if (!placeholder) {
+    invariant(Number.isInteger(value) && value >= min && value <= max, `invalid ${name}`);
+    return;
+  }
+  invariant(placeholder.schema.type === 'integer', `${name} placeholder must reference an integer argument`);
+  invariant((placeholder.schema.minimum ?? min) >= min, `${name} placeholder minimum is unsafe`);
+  invariant((placeholder.schema.maximum ?? max) <= max, `${name} placeholder maximum is unsafe`);
+}
+
+function validateOperation(operation, argumentsSchema = {}) {
+  invariant(operation && typeof operation === 'object' && !Array.isArray(operation), 'invalid adapter operation');
+  invariant(ALLOWED_ADAPTER_OPS.has(operation.op), `adapter operation denied: ${operation.op}`);
+  const allowedFields = OPERATION_FIELDS[operation.op];
+  invariant(allowedFields, `operation field policy missing: ${operation.op}`);
+  for (const key of Object.keys(operation)) invariant(allowedFields.has(key), `unexpected field ${key} for ${operation.op}`);
+
+  switch (operation.op) {
+    case 'storage_info':
+    case 'storage_list':
+    case 'storage_stat':
+    case 'app_load_file':
+      validateStringOrPlaceholder(operation.path, `${operation.op}.path`, 255, argumentsSchema);
+      break;
+    case 'storage_write':
+    case 'artifact_stage':
+      validateStringOrPlaceholder(operation.artifact_id, `${operation.op}.artifact_id`, 96, argumentsSchema);
+      validateStringOrPlaceholder(operation.destination_path, `${operation.op}.destination_path`, 255, argumentsSchema);
+      break;
+    case 'app_start':
+      validateStringOrPlaceholder(operation.app_name, 'app_start.app_name', 64, argumentsSchema);
+      if (operation.args !== undefined) {
+        const placeholder = placeholderProperty(operation.args, argumentsSchema, 'app_start.args');
+        if (placeholder) {
+          invariant(placeholder.schema.type === 'string', 'app_start.args placeholder must reference a string argument');
+          invariant((placeholder.schema.maxLength ?? 256) <= 256, 'app_start.args placeholder maximum exceeds limit');
+        } else {
+          invariant(typeof operation.args === 'string' && operation.args.length <= 256, 'app_start.args is invalid');
+        }
+      }
+      break;
+    case 'app_button':
+      if (operation.index !== undefined) {
+        validateIntegerOrPlaceholder(operation.index, 'app_button.index', 0, 2147483647, argumentsSchema);
+      } else {
+        validateStringOrPlaceholder(operation.args, 'app_button.args', 128, argumentsSchema);
+      }
+      break;
+    case 'gui_input':
+      validateEnumOrPlaceholder(operation.key, ['up', 'down', 'right', 'left', 'ok', 'back'], 'gui_input.key', argumentsSchema);
+      validateEnumOrPlaceholder(operation.press, ['press', 'release', 'short', 'long'], 'gui_input.press', argumentsSchema);
+      break;
+    case 'gpio_read':
+      validateEnumOrPlaceholder(operation.pin, ['PC0', 'PC1', 'PC3', 'PB2', 'PB3', 'PA4', 'PA6', 'PA7'], 'gpio_read.pin', argumentsSchema);
+      break;
+    case 'property_get':
+      validateStringOrPlaceholder(operation.property_key, 'property_get.property_key', 128, argumentsSchema);
+      break;
+    case 'wait_ms':
+      validateIntegerOrPlaceholder(operation.ms, 'wait_ms.ms', 1, 10000, argumentsSchema);
+      break;
+    case 'expect':
+      validateStringOrPlaceholder(operation.expectation, 'expect.expectation', 256, argumentsSchema);
+      break;
+    default:
+      break;
+  }
+}
+
+export function validateAdapter(adapter) {
+  invariant(adapter?.adapter_version === '1.0', 'unsupported adapter version');
+  invariant(ID.test(adapter.adapter_id ?? ''), 'invalid adapter_id');
+  invariant(ID.test(adapter.app_id ?? ''), 'invalid app_id');
+  invariant(ID.test(adapter.function ?? ''), 'invalid function');
+  invariant(RISKS.includes(adapter.risk), 'invalid adapter risk');
+  invariant(Array.isArray(adapter.operations) && adapter.operations.length > 0 && adapter.operations.length <= 128, 'invalid adapter operations');
+  invariant(Array.isArray(adapter.test_plan) && adapter.test_plan.length > 0 && adapter.test_plan.length <= 16, 'adapter test plan required');
+  const argumentsSchema = adapter.arguments_schema ?? {type: 'object', additionalProperties: false, required: [], properties: {}};
+  invariant(argumentsSchema.type === 'object', 'arguments_schema must describe an object');
+  invariant(argumentsSchema.properties && typeof argumentsSchema.properties === 'object' && !Array.isArray(argumentsSchema.properties),
+    'arguments_schema.properties is required');
+  adapter.operations.forEach((operation) => validateOperation(operation, argumentsSchema));
+
+  walk(adapter, (value, key) => {
+    invariant(!DENIED_KEYS.has(key), `adapter field denied: ${key}`);
+    if (typeof value === 'string') invariant(!DENIED_TEXT.test(value), `adapter text denied at ${key}`);
+  });
+
+  if (['physical_output', 'transmit'].includes(adapter.risk)) {
+    invariant(adapter.operations.some((operation) => operation.op === 'deck_confirm'),
+      `${adapter.risk} adapter requires deck_confirm`);
+  }
+  if (adapter.risk === 'transmit') {
+    invariant(adapter.requires?.frequency_profile, 'transmit adapter requires a frequency profile');
+  }
+  return adapter;
+}
+
+export function validateScript(script) {
+  invariant(script?.script_version === '1.0', 'unsupported script version');
+  invariant(ID.test(script.script_id ?? ''), 'invalid script_id');
+  requireString(script.description, 'script.description', 512);
+  invariant(RISKS.includes(script.risk), 'invalid script risk');
+  invariant(Array.isArray(script.steps) && script.steps.length > 0 && script.steps.length <= 128, 'invalid script steps');
+  invariant(Array.isArray(script.test_plan) && script.test_plan.length > 0 && script.test_plan.length <= 16, 'script test plan required');
+  const seen = new Set();
+  for (const step of script.steps) {
+    invariant(step && typeof step === 'object' && !Array.isArray(step), 'invalid script step');
+    invariant(ID.test(step.id ?? ''), 'invalid script step id');
+    invariant(!seen.has(step.id), `duplicate script step id: ${step.id}`);
+    seen.add(step.id);
+    invariant(ID.test(step.app_id ?? ''), `invalid script app_id: ${step.id}`);
+    invariant(ID.test(step.function ?? ''), `invalid script function: ${step.id}`);
+    if (step.approval) invariant(['auto', 'deck', 'operator'].includes(step.approval), `invalid script approval: ${step.id}`);
+    if (step.on_error) invariant(['stop', 'continue'].includes(step.on_error), `invalid script on_error: ${step.id}`);
+    if (step.timeout_ms !== undefined) invariant(Number.isInteger(step.timeout_ms) && step.timeout_ms >= 100 && step.timeout_ms <= 120000,
+      `invalid script timeout: ${step.id}`);
+  }
+  walk(script, (value, key) => {
+    invariant(!DENIED_KEYS.has(key), `script field denied: ${key}`);
+    if (typeof value === 'string') invariant(!DENIED_TEXT.test(value), `script text denied at ${key}`);
+  });
+  return script;
+}
+
+function baseAdapter(adapter) {
+  const copy = structuredClone(adapter);
+  for (const key of ['origin', 'verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at', 'test_evidence_sha256']) {
+    delete copy[key];
+  }
+  return copy;
+}
+
+function normalizeAdapter(adapter, metadata) {
+  const base = validateAdapter(baseAdapter(adapter));
+  const digest = sha256(`${stableJson(base)}\n`);
+  if (metadata.sha256) invariant(metadata.sha256 === digest, `adapter integrity failure: ${base.adapter_id}`);
+  return {...base, ...metadata, sha256: digest};
+}
+
+function baseScript(script) {
+  const copy = structuredClone(script);
+  for (const key of ['verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at', 'test_evidence_sha256', 'origin']) {
+    delete copy[key];
+  }
+  return copy;
+}
+
+function normalizeScript(script, metadata) {
+  const base = validateScript(baseScript(script));
+  const digest = sha256(`${stableJson(base)}\n`);
+  if (metadata.sha256) invariant(metadata.sha256 === digest, `script integrity failure: ${base.script_id}`);
+  return {...base, ...metadata, sha256: digest};
+}
+
+export class CatalogService {
+  constructor({packageRoot, stateDir}) {
+    this.packageRoot = packageRoot;
+    this.stateDir = stateDir;
+    this.catalogPath = path.join(packageRoot, 'catalog', 'catalog.json');
+    this.adaptersPath = path.join(packageRoot, 'catalog', 'adapters.json');
+    this.generatedPath = path.join(stateDir, 'catalog.generated.json');
+    this.inventoryPath = path.join(stateDir, 'inventory.json');
+    this.loaded = false;
+  }
+
+  async load() {
+    if (this.loaded) return;
+    const [catalog, bundled] = await Promise.all([readJson(this.catalogPath), readJson(this.adaptersPath)]);
+    let generated = {adapters: {}, scripts: {}};
+    try {
+      generated = JSON.parse(await readFile(this.generatedPath, 'utf8'));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+
+    this.catalog = catalog;
+    this.adapters = {};
+    for (const [adapterId, adapter] of Object.entries(bundled.adapters ?? {})) {
+      invariant(adapter.adapter_id === adapterId, `bundled adapter key mismatch: ${adapterId}`);
+      this.adapters[adapterId] = normalizeAdapter(adapter, {
+        origin: 'bundled',
+        verification_status: 'bundled_verified',
+      });
+    }
+
+    this.generated = generated;
+    for (const [adapterId, adapter] of Object.entries(generated.adapters ?? {})) {
+      invariant(adapter.adapter_id === adapterId, `generated adapter key mismatch: ${adapterId}`);
+      this.adapters[adapterId] = normalizeAdapter(adapter, {
+        origin: 'generated',
+        verification_status: adapter.verification_status ?? 'staged_pending_review',
+        artifact_id: adapter.artifact_id,
+        verified_by: adapter.verified_by,
+        verified_at: adapter.verified_at,
+        test_evidence_sha256: adapter.test_evidence_sha256,
+        sha256: adapter.sha256,
+      });
+      this.catalog.apps[adapter.app_id] ??= {display_name: adapter.app_id, discovered: true, functions: {}};
+      this.catalog.apps[adapter.app_id].functions[adapter.function] = {
+        operation: 'adapter',
+        adapter_id: adapter.adapter_id,
+        risk: adapter.risk,
+        libraries: adapter.requires?.libraries ?? [],
+        generated: true,
+        verification_status: this.adapters[adapterId].verification_status,
+      };
+    }
+
+    this.scripts = {...(catalog.scripts ?? {})};
+    for (const [scriptId, entry] of Object.entries(generated.scripts ?? {})) {
+      const source = entry.script ?? entry;
+      invariant(source.script_id === scriptId, `generated script key mismatch: ${scriptId}`);
+      const normalized = normalizeScript(source, {
+        origin: 'generated',
+        verification_status: entry.verification_status ?? 'staged_pending_review',
+        artifact_id: entry.artifact_id,
+        verified_by: entry.verified_by,
+        verified_at: entry.verified_at,
+        test_evidence_sha256: entry.test_evidence_sha256,
+        sha256: entry.sha256,
+      });
+      this.generated.scripts[scriptId] = normalized;
+      this.scripts[scriptId] = normalized;
+    }
+    this.loaded = true;
+  }
+
+  async snapshot() {
+    await this.load();
+    let inventory = null;
+    try {
+      inventory = JSON.parse(await readFile(this.inventoryPath, 'utf8'));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    return {
+      catalog_version: this.catalog.catalog_version,
+      capabilities: this.catalog.capabilities,
+      apps: this.catalog.apps,
+      installed_apps: inventory?.flipper?.apps ?? [],
+      adapters: Object.fromEntries(Object.entries(this.adapters).map(([adapterId, adapter]) => [adapterId, {
+        sha256: adapter.sha256,
+        origin: adapter.origin,
+        verification_status: adapter.verification_status,
+      }])),
+      scripts: Object.fromEntries(Object.entries(this.scripts).map(([scriptId, script]) => [scriptId, {
+        sha256: script.sha256 ?? null,
+        origin: script.origin ?? 'bundled',
+        verification_status: script.verification_status ?? 'bundled_verified',
+      }])),
+    };
+  }
+
+  async resolveCapability(name) {
+    await this.load();
+    const entry = this.catalog.capabilities[name];
+    return entry ? structuredClone(entry) : null;
+  }
+
+  async resolveAppFunction(appId, functionName) {
+    await this.load();
+    const functionEntry = this.catalog.apps[appId]?.functions?.[functionName];
+    if (!functionEntry?.adapter_id) return null;
+    const adapter = this.adapters[functionEntry.adapter_id];
+    if (!adapter) return null;
+    return {
+      app_id: appId,
+      function: functionName,
+      ...structuredClone(functionEntry),
+      adapter: structuredClone(adapter),
+      libraries: [...new Set([...(functionEntry.libraries ?? []), ...(adapter.requires?.libraries ?? [])])],
+      frequency: functionEntry.frequency ?? null,
+    };
+  }
+
+  async resolveScript(scriptId) {
+    await this.load();
+    const script = this.scripts[scriptId];
+    if (!script) return null;
+    validateScript(script);
+    return {
+      operation: 'script',
+      artifact_id: script.artifact_id ?? '',
+      risk: script.risk,
+      libraries: script.libraries ?? [],
+      script: structuredClone(baseScript(script)),
+      sha256: script.sha256,
+      origin: script.origin ?? 'bundled',
+      verification_status: script.verification_status ?? 'bundled_verified',
+      verified_by: script.verified_by,
+      test_evidence_sha256: script.test_evidence_sha256,
+    };
+  }
+
+  async getAdapter(adapterId) {
+    await this.load();
+    const adapter = this.adapters[adapterId];
+    return adapter ? structuredClone(adapter) : null;
+  }
+
+  async registerGeneratedAdapter(appId, functionName, staged) {
+    await this.load();
+    invariant(staged?.type === 'adapter' && staged.value, 'staged adapter required');
+    const adapter = validateAdapter(staged.value);
+    invariant(adapter.app_id === appId && adapter.function === functionName, 'generated adapter target mismatch');
+    invariant(adapter.operations.some((operation) => operation.op === 'deck_confirm'),
+      'every generated adapter requires explicit Deck confirmation');
+    const normalized = normalizeAdapter(adapter, {
+      origin: 'generated',
+      verification_status: 'staged_pending_review',
+      artifact_id: staged.artifact_id,
+      sha256: staged.sha256,
+    });
+    this.generated.adapters ??= {};
+    this.generated.adapters[adapter.adapter_id] = normalized;
+    this.adapters[adapter.adapter_id] = normalized;
+    this.catalog.apps[appId] ??= {display_name: appId, discovered: true, functions: {}};
+    this.catalog.apps[appId].functions[functionName] = {
+      operation: 'adapter', adapter_id: adapter.adapter_id, risk: adapter.risk,
+      libraries: adapter.requires?.libraries ?? [], generated: true,
+      verification_status: 'staged_pending_review',
+    };
+    await this.#persistGenerated();
+  }
+
+  async promoteGeneratedAdapter({adapterId, operatorId, testEvidenceSha256}) {
+    await this.load();
+    invariant(ID.test(operatorId ?? ''), 'operator ID is required');
+    invariant(SHA256.test(testEvidenceSha256 ?? ''), 'test evidence SHA-256 is required');
+    const adapter = this.generated.adapters?.[adapterId];
+    invariant(adapter, `generated adapter not found: ${adapterId}`);
+    adapter.verification_status = 'operator_verified';
+    adapter.verified_by = operatorId;
+    adapter.verified_at = new Date().toISOString();
+    adapter.test_evidence_sha256 = testEvidenceSha256;
+    this.adapters[adapterId] = normalizeAdapter(adapter, {
+      origin: 'generated',
+      verification_status: adapter.verification_status,
+      artifact_id: adapter.artifact_id,
+      verified_by: adapter.verified_by,
+      verified_at: adapter.verified_at,
+      test_evidence_sha256: adapter.test_evidence_sha256,
+      sha256: adapter.sha256,
+    });
+    const functionEntry = this.catalog.apps[adapter.app_id]?.functions?.[adapter.function];
+    if (functionEntry) functionEntry.verification_status = 'operator_verified';
+    this.generated.adapters[adapterId] = this.adapters[adapterId];
+    await this.#persistGenerated();
+    return structuredClone(this.adapters[adapterId]);
+  }
+
+  async registerGeneratedScript(scriptId, staged) {
+    await this.load();
+    invariant(staged?.type === 'script' && staged.value, 'staged script required');
+    const script = validateScript(staged.value);
+    invariant(script.script_id === scriptId, 'generated script target mismatch');
+    const normalized = normalizeScript(script, {
+      origin: 'generated',
+      verification_status: 'staged_pending_review',
+      artifact_id: staged.artifact_id,
+      sha256: staged.sha256,
+    });
+    this.generated.scripts ??= {};
+    this.generated.scripts[scriptId] = normalized;
+    this.scripts[scriptId] = normalized;
+    await this.#persistGenerated();
+  }
+
+  async promoteGeneratedScript({scriptId, operatorId, testEvidenceSha256}) {
+    await this.load();
+    invariant(ID.test(operatorId ?? ''), 'operator ID is required');
+    invariant(SHA256.test(testEvidenceSha256 ?? ''), 'test evidence SHA-256 is required');
+    const script = this.generated.scripts?.[scriptId];
+    invariant(script, `generated script not found: ${scriptId}`);
+    script.verification_status = 'operator_verified';
+    script.verified_by = operatorId;
+    script.verified_at = new Date().toISOString();
+    script.test_evidence_sha256 = testEvidenceSha256;
+    const normalized = normalizeScript(script, {
+      origin: 'generated',
+      verification_status: script.verification_status,
+      artifact_id: script.artifact_id,
+      verified_by: script.verified_by,
+      verified_at: script.verified_at,
+      test_evidence_sha256: script.test_evidence_sha256,
+      sha256: script.sha256,
+    });
+    this.generated.scripts[scriptId] = normalized;
+    this.scripts[scriptId] = normalized;
+    await this.#persistGenerated();
+    return structuredClone(normalized);
+  }
+
+  async ingestInventory(inventory) {
+    invariant(inventory?.flipper?.online === true, 'Flipper inventory reports offline');
+    invariant(inventory.flipper.physical_owner === 'deck-cyd', 'invalid inventory physical owner');
+    invariant(Array.isArray(inventory.flipper.apps), 'invalid inventory app list');
+    await mkdir(this.stateDir, {recursive: true});
+    await atomicWriteJson(this.inventoryPath, inventory);
+    return {sha256: sha256(stableJson(inventory)), appCount: inventory.flipper.apps.length};
+  }
+
+  async #persistGenerated() {
+    await mkdir(this.stateDir, {recursive: true});
+    await atomicWriteJson(this.generatedPath, this.generated);
+  }
+}

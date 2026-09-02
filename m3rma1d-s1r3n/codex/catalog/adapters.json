@@ -1,0 +1,192 @@
+{
+  "adapter_catalog_version": "2.0",
+  "transport": "flipper-expansion-rpc-v1",
+  "adapters": {
+    "stock.system.device_info": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.system.device_info",
+      "app_id": "system.device",
+      "function": "info",
+      "description": "Read Flipper system device information through official RPC.",
+      "risk": "observe",
+      "operations": [{"op": "system_device_info"}],
+      "test_plan": ["Verify the RPC response contains at least one device information key/value pair."]
+    },
+    "stock.system.power_info": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.system.power_info",
+      "app_id": "system.device",
+      "function": "power_info",
+      "description": "Read Flipper power information through official RPC.",
+      "risk": "observe",
+      "operations": [{"op": "system_power_info"}],
+      "test_plan": ["Verify the RPC response contains power information and performs no state change."]
+    },
+    "stock.storage.info": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.storage.info",
+      "app_id": "system.storage",
+      "function": "info",
+      "description": "Read storage capacity for an approved Flipper filesystem root.",
+      "risk": "observe",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "enum": ["/ext", "/int", "/any"]}}
+      },
+      "operations": [{"op": "storage_info", "path": "${path}"}],
+      "test_plan": ["Verify total and free space are returned for the selected filesystem root."]
+    },
+    "stock.storage.list": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.storage.list",
+      "app_id": "system.storage",
+      "function": "list",
+      "description": "List an approved Flipper storage directory through official RPC.",
+      "risk": "observe",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^/(ext|int|any)(/[A-Za-z0-9._ ()+-]+)*$"}}
+      },
+      "operations": [{"op": "storage_list", "path": "${path}"}],
+      "test_plan": ["Verify the selected directory listing is returned without modifying storage."]
+    },
+    "stock.storage.stat": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.storage.stat",
+      "app_id": "system.storage",
+      "function": "stat",
+      "description": "Read metadata for one approved Flipper storage path.",
+      "risk": "observe",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^/(ext|int|any)(/[A-Za-z0-9._ ()+-]+)*$"}}
+      },
+      "operations": [{"op": "storage_stat", "path": "${path}"}],
+      "test_plan": ["Verify file type and size are returned for an existing owned path."]
+    },
+    "stock.app.start": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.app.start",
+      "app_id": "system.app",
+      "function": "start",
+      "description": "Start an installed Flipper application through official RPC.",
+      "risk": "local_state",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["app_name", "args"],
+        "properties": {
+          "app_name": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9 _.-]+$"},
+          "args": {"type": "string", "maxLength": 256}
+        }
+      },
+      "operations": [{"op": "app_start", "app_name": "${app_name}", "args": "${args}"}],
+      "test_plan": ["Start a known harmless installed app and verify an OK RPC status.", "Exit the app after verification."]
+    },
+    "stock.app.exit": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.app.exit",
+      "app_id": "system.app",
+      "function": "exit",
+      "description": "Request the currently running RPC application to exit.",
+      "risk": "local_state",
+      "operations": [{"op": "app_exit"}],
+      "test_plan": ["Start an RPC-capable test app, request exit, and verify the app reports closed."]
+    },
+    "stock.app.load_file": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.app.load_file",
+      "app_id": "system.app",
+      "function": "load_file",
+      "description": "Send an owned file path to the currently running RPC-capable app.",
+      "risk": "local_state",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^/(ext|int|any)(/[A-Za-z0-9._ ()+-]+)*$"}}
+      },
+      "operations": [{"op": "app_load_file", "path": "${path}"}],
+      "test_plan": ["Run an RPC-capable app, load an existing owned file, and verify the app acknowledges the request."]
+    },
+    "stock.gui.input": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.gui.input",
+      "app_id": "system.gui",
+      "function": "input",
+      "description": "Send one bounded Flipper GUI input event through official RPC.",
+      "risk": "local_state",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "press"],
+        "properties": {
+          "key": {"type": "string", "enum": ["up", "down", "right", "left", "ok", "back"]},
+          "press": {"type": "string", "enum": ["press", "release", "short", "long"]}
+        }
+      },
+      "operations": [{"op": "gui_input", "key": "${key}", "press": "${press}"}],
+      "test_plan": ["Open a harmless screen and verify the requested single input event changes only the expected UI selection."]
+    },
+    "stock.gpio.read": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.gpio.read",
+      "app_id": "system.gpio",
+      "function": "read",
+      "description": "Read one supported Flipper GPIO input through official RPC.",
+      "risk": "observe",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pin"],
+        "properties": {"pin": {"type": "string", "enum": ["PC0", "PC1", "PC3", "PB2", "PB3", "PA4", "PA6", "PA7"]}}
+      },
+      "operations": [{"op": "gpio_read", "pin": "${pin}"}],
+      "test_plan": ["Configure the selected pin as an input outside this run and verify the RPC read returns a binary value."]
+    },
+    "stock.property.get": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.property.get",
+      "app_id": "system.property",
+      "function": "get",
+      "description": "Read an approved Flipper property through official RPC.",
+      "risk": "observe",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["property_key"],
+        "properties": {"property_key": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$"}}
+      },
+      "operations": [{"op": "property_get", "property_key": "${property_key}"}],
+      "test_plan": ["Request a documented property and verify the returned key matches the request."]
+    },
+    "stock.artifact.stage": {
+      "adapter_version": "1.0",
+      "adapter_id": "stock.artifact.stage",
+      "app_id": "system.storage",
+      "function": "stage_artifact",
+      "description": "Write one SHA-256 verified local artifact to an approved external-storage path.",
+      "risk": "physical_output",
+      "arguments_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "destination_path"],
+        "properties": {
+          "artifact_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+          "destination_path": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^/ext/[A-Za-z0-9._ ()+/-]+$"}
+        }
+      },
+      "operations": [
+        {"op": "deck_confirm"},
+        {"op": "artifact_stage", "artifact_id": "${artifact_id}", "destination_path": "${destination_path}"}
+      ],
+      "test_plan": ["Confirm the Deck displays the artifact ID, SHA-256, size, and destination before approval.", "Verify the Flipper storage MD5 or readback content after staging."]
+    }
+  }
+}

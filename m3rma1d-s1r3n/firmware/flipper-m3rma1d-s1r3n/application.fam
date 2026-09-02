@@ -1,0 +1,13 @@
+App(
+    appid="m3rma1d_s1r3n",
+    name="M3rMa1d S1r3n",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="m3rma1d_s1r3n_app",
+    requires=["gui"],
+    stack_size=2 * 1024,
+    fap_category="Tools",
+    fap_version="0.1.0-ut",
+    fap_description="M3rMa1d S1r3n Codex/ADL status and operator control surface",
+    fap_author="918 Technologies",
+    fap_weburl="https://github.com/BlockChain-BailBonds/BlockChainBailbonds",
+)

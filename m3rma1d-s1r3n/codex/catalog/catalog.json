@@ -1,0 +1,63 @@
+{
+  "catalog_version": "2.0",
+  "transport": "flipper-expansion-rpc-v1",
+  "capabilities": {
+    "device_info": {"operation": "adapter", "adapter_id": "stock.system.device_info", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "power_info": {"operation": "adapter", "adapter_id": "stock.system.power_info", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "storage_info": {"operation": "adapter", "adapter_id": "stock.storage.info", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "storage_list": {"operation": "adapter", "adapter_id": "stock.storage.list", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "storage_stat": {"operation": "adapter", "adapter_id": "stock.storage.stat", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "app_start": {"operation": "adapter", "adapter_id": "stock.app.start", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+    "app_exit": {"operation": "adapter", "adapter_id": "stock.app.exit", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+    "app_load_file": {"operation": "adapter", "adapter_id": "stock.app.load_file", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+    "gui_input": {"operation": "adapter", "adapter_id": "stock.gui.input", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+    "gpio_read": {"operation": "adapter", "adapter_id": "stock.gpio.read", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "property_get": {"operation": "adapter", "adapter_id": "stock.property.get", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+    "stage_artifact": {"operation": "adapter", "adapter_id": "stock.artifact.stage", "risk": "physical_output", "libraries": ["flipper.official.protobuf"]}
+  },
+  "apps": {
+    "system.device": {
+      "display_name": "Flipper system",
+      "functions": {
+        "info": {"operation": "adapter", "adapter_id": "stock.system.device_info", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+        "power_info": {"operation": "adapter", "adapter_id": "stock.system.power_info", "risk": "observe", "libraries": ["flipper.official.protobuf"]}
+      }
+    },
+    "system.storage": {
+      "display_name": "Flipper storage",
+      "functions": {
+        "info": {"operation": "adapter", "adapter_id": "stock.storage.info", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+        "list": {"operation": "adapter", "adapter_id": "stock.storage.list", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+        "stat": {"operation": "adapter", "adapter_id": "stock.storage.stat", "risk": "observe", "libraries": ["flipper.official.protobuf"]},
+        "stage_artifact": {"operation": "adapter", "adapter_id": "stock.artifact.stage", "risk": "physical_output", "libraries": ["flipper.official.protobuf"]}
+      }
+    },
+    "system.app": {
+      "display_name": "Flipper application service",
+      "functions": {
+        "start": {"operation": "adapter", "adapter_id": "stock.app.start", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+        "exit": {"operation": "adapter", "adapter_id": "stock.app.exit", "risk": "local_state", "libraries": ["flipper.official.protobuf"]},
+        "load_file": {"operation": "adapter", "adapter_id": "stock.app.load_file", "risk": "local_state", "libraries": ["flipper.official.protobuf"]}
+      }
+    },
+    "system.gui": {
+      "display_name": "Flipper GUI input",
+      "functions": {
+        "input": {"operation": "adapter", "adapter_id": "stock.gui.input", "risk": "local_state", "libraries": ["flipper.official.protobuf"]}
+      }
+    },
+    "system.gpio": {
+      "display_name": "Flipper GPIO",
+      "functions": {
+        "read": {"operation": "adapter", "adapter_id": "stock.gpio.read", "risk": "observe", "libraries": ["flipper.official.protobuf"]}
+      }
+    },
+    "system.property": {
+      "display_name": "Flipper properties",
+      "functions": {
+        "get": {"operation": "adapter", "adapter_id": "stock.property.get", "risk": "observe", "libraries": ["flipper.official.protobuf"]}
+      }
+    }
+  },
+  "scripts": {}
+}
