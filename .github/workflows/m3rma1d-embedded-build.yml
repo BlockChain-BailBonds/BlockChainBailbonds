@@ -1,7 +1,7 @@
 name: M3rMa1d S1r3n Embedded Firmware
 on:
   push:
-    branches: [feat/m3rma1d-s1r3n-integrated-firmware]
+    branches: [feat/m3rma1d-s1r3n-integrated-firmware, feat/m3rma1d-s1r3n-embedded-ut]
     paths: ['m3rma1d-s1r3n/firmware/**','.github/workflows/m3rma1d-embedded-build.yml']
   pull_request:
     paths: ['m3rma1d-s1r3n/firmware/**','.github/workflows/m3rma1d-embedded-build.yml']
