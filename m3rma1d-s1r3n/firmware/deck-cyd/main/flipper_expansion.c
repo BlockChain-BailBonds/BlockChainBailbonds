@@ -1,0 +1,12 @@
+#include "flipper_expansion.h"
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+static bool write_frame(s1r3n_expansion_t* e,const uint8_t* frame,size_t len){return uart_write_bytes(e->uart,(const char*)frame,len)==(int)len;}
+static bool read_status_ok(s1r3n_expansion_t* e){uint8_t r[3]={0};int n=uart_read_bytes(e->uart,r,sizeof(r),pdMS_TO_TICKS(S1R3N_EXP_TIMEOUT_MS));if(n!=3||r[0]!=EXP_STATUS||r[2]!=s1r3n_exp_checksum(r,2))return false;return r[1]==EXP_OK;}
+uint8_t s1r3n_exp_checksum(const uint8_t* data,size_t len){uint8_t c=0;for(size_t i=0;i<len;i++)c^=data[i];return c;}
+bool s1r3n_exp_init(s1r3n_expansion_t* e,uart_port_t uart,int tx,int rx){if(!e)return false;memset(e,0,sizeof(*e));e->uart=uart;e->tx=tx;e->rx=rx;e->baud=9600;uart_config_t cfg={.baud_rate=9600,.data_bits=UART_DATA_8_BITS,.parity=UART_PARITY_DISABLE,.stop_bits=UART_STOP_BITS_1,.flow_ctrl=UART_HW_FLOWCTRL_DISABLE,.source_clk=UART_SCLK_DEFAULT};if(uart_driver_install(uart,2048,2048,0,NULL,0)!=ESP_OK)return false;if(uart_param_config(uart,&cfg)!=ESP_OK)return false;if(uart_set_pin(uart,tx,rx,UART_PIN_NO_CHANGE,UART_PIN_NO_CHANGE)!=ESP_OK)return false;return true;}
+bool s1r3n_exp_negotiate(s1r3n_expansion_t* e,uint32_t baud){if(!e||baud<9600)return false;uint8_t f[6];f[0]=EXP_BAUD;memcpy(f+1,&baud,4);f[5]=s1r3n_exp_checksum(f,5);if(!write_frame(e,f,sizeof(f))||!read_status_ok(e))return false;vTaskDelay(pdMS_TO_TICKS(25));if(uart_set_baudrate(e->uart,baud)!=ESP_OK)return false;e->baud=baud;return true;}
+bool s1r3n_exp_start_rpc(s1r3n_expansion_t* e){if(!e||e->rpc_active)return false;uint8_t f[3]={EXP_CONTROL,EXP_START_RPC,0};f[2]=s1r3n_exp_checksum(f,2);if(!write_frame(e,f,3)||!read_status_ok(e))return false;e->rpc_active=true;return true;}
+bool s1r3n_exp_stop_rpc(s1r3n_expansion_t* e){if(!e||!e->rpc_active)return false;uint8_t f[3]={EXP_CONTROL,EXP_STOP_RPC,0};f[2]=s1r3n_exp_checksum(f,2);bool ok=write_frame(e,f,3)&&read_status_ok(e);e->rpc_active=false;return ok;}
+bool s1r3n_exp_write_rpc(s1r3n_expansion_t* e,const uint8_t* data,size_t len){if(!e||!e->rpc_active||!data)return false;size_t off=0;while(off<len){size_t n=len-off>S1R3N_EXP_DATA_MAX?S1R3N_EXP_DATA_MAX:len-off;uint8_t f[1+1+S1R3N_EXP_DATA_MAX+1];f[0]=EXP_DATA;f[1]=(uint8_t)n;memcpy(f+2,data+off,n);f[2+n]=s1r3n_exp_checksum(f,2+n);if(!write_frame(e,f,3+n)||!read_status_ok(e))return false;off+=n;}return true;}
