@@ -1,0 +1,32 @@
+name: M3rMa1d S1r3n Embedded Firmware
+on:
+  push:
+    branches: [feat/m3rma1d-s1r3n-integrated-firmware, feat/m3rma1d-s1r3n-embedded-ut]
+    paths: ['m3rma1d-s1r3n/firmware/**','.github/workflows/m3rma1d-embedded-build.yml']
+  pull_request:
+    paths: ['m3rma1d-s1r3n/firmware/**','.github/workflows/m3rma1d-embedded-build.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: core-s3, target: esp32s3}
+          - {name: vision-s3-ov3660, target: esp32s3}
+          - {name: c5-guardian, target: esp32c5}
+          - {name: c5-watcher, target: esp32c5}
+          - {name: c5-arbiter, target: esp32c5}
+          - {name: deck-cyd, target: esp32}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5
+          target: ${{ matrix.target }}
+          path: m3rma1d-s1r3n/firmware/${{ matrix.name }}
+      - name: Record identity
+        shell: bash
+        run: |
+          find m3rma1d-s1r3n/firmware/${{ matrix.name }}/build -maxdepth 1 -type f \( -name '*.bin' -o -name '*.elf' \) -print0 | xargs -0 -r sha256sum
