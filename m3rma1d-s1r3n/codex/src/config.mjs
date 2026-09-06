@@ -44,19 +44,18 @@ export async function loadConfig(env = process.env) {
     execution: {
       maxConcurrentRuns: defaults.execution.max_concurrent_runs,
       maxRunMs: defaults.execution.max_run_ms,
-      physicalOwner: 'deck-cyd',
+      physicalOwner: 's3-cam',
       allowFallbackPhysicalRoute: false,
-      requireSafetyQuorum: defaults.execution.require_safety_quorum,
-      requiredSafetyNodes: defaults.execution.required_safety_nodes,
-      requireFlipperOnline: true,
-      requireDeckOnline: true,
+      requireFlipperOnline: defaults.execution.require_flipper_online !== false,
     },
     policy: {
       allowGeneratedAdapterExecution: parseBoolean(
         env.S1R3N_ALLOW_GENERATED_ADAPTER_EXECUTION,
         defaults.policy.allow_generated_adapter_execution,
       ),
-      requireVisionForGeneratedAdapters: defaults.policy.require_vision_for_generated_adapters,
+      requireVisionForGeneratedAdapters: defaults.policy.require_vision_for_generated_high_risk_adapters !== false,
+      machineVerifyMaxRisk: defaults.policy.machine_verify_max_risk ?? 'local_state',
+      defaultRegionProfile: env.S1R3N_REGION_PROFILE ?? defaults.region_profile,
     },
     artifacts: {
       allowNetwork: parseBoolean(env.S1R3N_ALLOW_NETWORK_ARTIFACTS, defaults.artifacts.allow_network),
