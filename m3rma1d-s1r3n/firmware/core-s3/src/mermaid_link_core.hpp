@@ -51,6 +51,7 @@ public:
     void setCodexLinked(bool value);
     void setCameraReady(bool value);
     void setApprovalPending(bool value);
+    void setExecutionAuthorized(bool value);
     void setCatalog(const CatalogSummary& catalog);
     void assertStop();
     bool stopAsserted() const;
@@ -63,6 +64,7 @@ private:
     size_t rx_len_ = 0;
     uint32_t next_seq_ = 1;
     uint32_t last_peer_ms_ = 0;
+    bool execution_authorized_ = false;
     RemoteState state_{};
     CatalogSummary catalog_{};
 
