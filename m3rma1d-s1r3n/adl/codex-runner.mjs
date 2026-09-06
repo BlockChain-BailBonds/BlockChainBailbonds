@@ -90,9 +90,9 @@ export function validateRun(run) {
 }
 
 function approvalRequired(risk, adapter) {
-  let required = risk >= Risk.physical_output ? 'deck' : 'auto';
-  if (adapter.origin === 'generated') required = 'operator';
-  return required;
+  if (adapter.origin === 'generated' && adapter.verification_status !== 'machine_verified') return 'operator';
+  if (adapter.autonomous_safe === true && risk <= Risk.local_state) return 'auto';
+  return risk >= Risk.physical_output ? 'deck' : 'auto';
 }
 
 function selectApproval(requested, required, stepId) {
@@ -185,6 +185,7 @@ async function resolveAdapterStep(run, step, services, ordinal) {
     adapter_id: adapter.adapter_id,
     adapter_origin: adapter.origin,
     adapter_verification_status: adapter.verification_status,
+    autonomous_safe: Boolean(adapter.autonomous_safe),
     app_id: step.app_id ?? adapter.app_id,
     function: step.function ?? adapter.function,
     arguments: step.arguments ?? {},
@@ -210,8 +211,8 @@ async function resolveScriptStep(run, step, services, ordinalStart) {
     resolved = await catalog.resolveScript(scriptId);
   }
   if (!resolved?.script) fail(`script unavailable: ${scriptId}`);
-  if (!['bundled_verified', 'operator_verified'].includes(resolved.verification_status)) {
-    fail(`script is staged but not operator-verified: ${scriptId}`);
+  if (!['bundled_verified', 'operator_verified', 'machine_verified'].includes(resolved.verification_status)) {
+    fail(`script is staged but not verified: ${scriptId}`);
   }
   if (Risk[resolved.script.risk] >= Risk.restricted) fail(`restricted script denied: ${scriptId}`);
 
