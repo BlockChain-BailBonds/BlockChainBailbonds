@@ -1,0 +1,44 @@
+name: M3rMa1d S1r3n Core S3
+
+on:
+  push:
+    branches:
+      - feat/m3rma1d-s1r3n-integrated-firmware
+      - main
+    paths:
+      - 'm3rma1d-s1r3n/firmware/core-s3/**'
+      - '.github/workflows/m3rma1d-core-s3.yml'
+  pull_request:
+    paths:
+      - 'm3rma1d-s1r3n/firmware/core-s3/**'
+      - '.github/workflows/m3rma1d-core-s3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-core-s3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: m3rma1d-s1r3n/firmware/core-s3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: python -m pip install --upgrade platformio
+      - name: Build Core S3
+        run: pio run
+      - name: Archive firmware binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3rMa1d-Core-S3-${{ github.sha }}
+          path: |
+            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/firmware.bin
+            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/bootloader.bin
+            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/partitions.bin
+          if-no-files-found: error
