@@ -22,6 +22,7 @@ typedef enum {
     MermaidMsgActionResult = 7,
     MermaidMsgStop = 8,
     MermaidMsgApproval = 9,
+    MermaidMsgReadyRequest = 10,
 } MermaidMsgType;
 
 typedef struct {
@@ -61,6 +62,7 @@ void mermaid_link_set_callbacks(
 void mermaid_link_poll(MermaidLink* link);
 bool mermaid_link_request_status(MermaidLink* link);
 bool mermaid_link_request_catalog(MermaidLink* link);
+bool mermaid_link_request_ready(MermaidLink* link);
 bool mermaid_link_send_stop(MermaidLink* link, uint32_t job_id);
 
 #ifdef __cplusplus
