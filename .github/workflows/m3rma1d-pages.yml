@@ -24,13 +24,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
       - name: Validate static hardware lab
         run: |
+          set -eu
           test -s m3rma1d-s1r3n/web-installer/index.html
+          test -s m3rma1d-s1r3n/web-installer/manifest.json
           grep -q 'M3rMa1d S1r3n Hardware Lab' m3rma1d-s1r3n/web-installer/index.html
-          grep -q 'Export Signed-style HTML Proof' m3rma1d-s1r3n/web-installer/index.html
-          grep -q 'Detect + Flash' m3rma1d-s1r3n/web-installer/index.html
-          grep -q 'Web Serial' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Detect + Flash Verified Firmware' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Export Whole-System Proof HTML + JSON' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Ed25519' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'm3rma1d.release-manifest.v1' m3rma1d-s1r3n/web-installer/manifest.json
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('m3rma1d-s1r3n/web-installer/manifest.json','utf8')); const r=['core-s3','vision-s3-ov3660','c5-guardian','c5-watcher','c5-arbiter','deck-cyd']; if(!m.signature_required) throw Error('signature_required must remain true'); for(const id of r) if(!m.roles[id]) throw Error('missing role '+id); console.log('manifest structure OK')"
 
   deploy:
     if: github.event_name != 'pull_request'
