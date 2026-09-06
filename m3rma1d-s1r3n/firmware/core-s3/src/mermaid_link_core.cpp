@@ -44,6 +44,7 @@ void MermaidLinkCore::begin() {
 
 void MermaidLinkCore::setCodexLinked(bool value) {
     state_.codex_linked = value;
+    if(!value) state_.stop_asserted = true;
 }
 
 void MermaidLinkCore::setCameraReady(bool value) {
@@ -52,6 +53,12 @@ void MermaidLinkCore::setCameraReady(bool value) {
 
 void MermaidLinkCore::setApprovalPending(bool value) {
     state_.approval_pending = value;
+    if(value) state_.stop_asserted = true;
+}
+
+void MermaidLinkCore::setExecutionAuthorized(bool value) {
+    execution_authorized_ = value;
+    if(!value) state_.stop_asserted = true;
 }
 
 void MermaidLinkCore::setCatalog(const CatalogSummary& catalog) {
@@ -148,7 +155,7 @@ void MermaidLinkCore::dispatch(uint8_t type, const uint8_t* payload, uint16_t le
         sendStatus();
         break;
     case MermaidMsgType::ReadyRequest: {
-        const bool ready = state_.codex_linked && !state_.approval_pending;
+        const bool ready = execution_authorized_ && state_.codex_linked && !state_.approval_pending;
         if(ready) {
             state_.stop_asserted = false;
             sendReadyResult(true, "ready");
@@ -225,6 +232,7 @@ void MermaidLinkCore::poll() {
     if(state_.heartbeat_ms > 3000U) {
         state_.stop_asserted = true;
         state_.codex_linked = false;
+        execution_authorized_ = false;
     }
 
     if(rx_len_ == sizeof(rx_)) {
