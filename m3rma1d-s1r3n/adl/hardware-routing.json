@@ -1,40 +1,43 @@
 {
-  "routing_version": "2.1",
+  "routing_version": "3.0",
   "logical_target": "flipper",
-  "physical_owner": "core-s3",
-  "topology": ["gateway", "core-s3", "flipper-zero"],
-  "approval_owner": "deck-cyd",
-  "safety_owner": "sentinel-c3",
+  "physical_owner": "s3-cam",
+  "topology": ["s3-cam", "flipper-zero"],
   "bridge": {
     "interface": "uart",
     "baud": 230400,
     "format": "8N1",
-    "core_rx_gpio": 18,
-    "core_tx_gpio": 17,
+    "s3_rx_gpio": 1,
+    "s3_tx_gpio": 2,
     "flipper_tx_pin": 13,
     "flipper_rx_pin": 14,
     "common_ground_required": true,
     "power_connection": false
   },
   "codex": {
-    "mode": "autonomous_verified_capabilities",
-    "shell": false,
-    "raw_cli": false,
+    "mode": "autonomous_point_click",
     "discover_installed_apps": true,
-    "generate_missing_adapters": true,
+    "generate_adapter_on_install": true,
     "generate_missing_scripts": true,
     "resolve_pinned_libraries": true,
     "resolve_registered_frequencies": true,
     "requires_verified_adapter": true,
     "requires_active_lease": true,
     "stop_preempts_all": true,
+    "raw_cli": false,
+    "shell": false,
     "approval_policy": {
       "observe": "automatic",
-      "local_state": "automatic",
-      "physical_output": "deck_or_operator",
-      "transmit": "deck_and_declared_asset",
+      "local_state": "automatic_after_machine_verification",
+      "physical_output": "user_point_click",
+      "transmit": "user_point_click_and_declared_asset",
       "restricted": "deny"
     }
+  },
+  "camera": {
+    "owner": "s3-cam",
+    "profile": "goouuu-v1.5-esp32s3-eye-signal-map",
+    "vision_feedback": true
   },
   "failure_mode": "fail_closed",
   "fallback_physical_route": false

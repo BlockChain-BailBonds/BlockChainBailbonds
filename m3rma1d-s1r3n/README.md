@@ -1,104 +1,97 @@
 # M3rMa1d S1r3n
 
-M3rMa1d S1r3n is a 918 Technologies Flipper Zero distribution built as an additive layer on top of Momentum Firmware. The user keeps the Momentum experience, apps, resources, and themes, while M3rMa1d adds Codex/ADL automation, Mermaid-native apps, MermaidLink control, and Mermaid visual themes.
+**918 Technologies — single ESP32-S3 N16R8 CAM + Flipper Zero + Codex/ADL point-and-click automation.**
 
-## Hardware
+M3rMa1d S1r3n is now a single-ESP32 hardware build. The only ESP board is the **GOOUUU ESP32-S3-CAM V1.5 / ESP32-S3-WROOM-1 N16R8** (16 MB flash, 8 MB octal PSRAM). It owns the camera, local web dashboard, Flipper UART bridge, STOP state, telemetry, and the hardware side of Codex tool execution. There is no CYD, second S3, C3/C5 safety node, or alternate hardware route.
 
-The active appliance is intentionally two-device:
+Codex itself runs in the companion `codex/` service rather than trying to run a GPT-class model inside the ESP32. The S3 serves the point-and-click interface and acts as Codex's physical Flipper tool. When a Flipper application first appears in inventory, the Codex service discovers its functions, generates typed ADL adapters, stages them, and machine-verifies eligible observe/local-state adapters on the connected device. Higher-impact actions remain explicit user point-and-click approvals.
 
-- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 + OV3660
-- 1 x Flipper Zero
-
-The S3-CAM is the companion controller and Codex bridge. The Flipper remains the user-facing point-and-click device.
-
-## Firmware inheritance rule
-
-Momentum Firmware is the base, not something M3rMa1d replaces.
-
-Required release invariant:
+## Repository layout
 
 ```text
-M3rMa1d Flipper image = pinned Momentum base + all Momentum apps/resources/themes + Mermaid additions
+m3rma1d-s1r3n/
+├── src/
+│   ├── main.cpp
+│   ├── codex_autonomous.cpp
+│   ├── camera_handler.cpp
+│   ├── web_ui.cpp
+│   └── flipper_bridge.cpp
+├── include/
+│   ├── config.h
+│   ├── codex_autonomous.h
+│   ├── camera_handler.h
+│   ├── web_ui.h
+│   └── flipper_bridge.h
+├── data/
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+├── adl/                 # ADL schema, resolver and fixed hardware route
+├── codex/               # Codex planner, adapter generator, watcher, audit and API
+├── platformio.ini
+├── partitions.csv
+└── README.md
 ```
 
-A M3rMa1d build must preserve every app, asset, menu feature, setting, and theme delivered by the pinned Momentum baseline unless a specific upstream item is impossible to build or has been explicitly excluded for a documented compatibility reason. Any such exclusion is a release blocker until recorded and approved.
+## What point-and-click means
 
-Current pinned upstream baseline:
+1. Power the S3-CAM and connect the Flipper UART: **S3 GPIO1 RX <- Flipper pin 13 TX**, **S3 GPIO2 TX -> Flipper pin 14 RX**, and **GND <-> GND**. Do not join the 5 V or 3.3 V power rails.
+2. Flash the ESP32 firmware and LittleFS UI.
+3. Open the S3 dashboard. The default setup AP is `M3rMa1d_S1r3n`; change the default AP password before deployment.
+4. Enter the Codex service URL/token once in the dashboard and click **Connect + sync apps**.
+5. Installed Flipper apps appear as cards. Functions with verified adapters appear as buttons. Clicking one asks Codex to plan the exact ADL run, resolve required scripts/libraries/frequency profiles, and execute it through the single S3-CAM route.
+6. If an action needs physical output or transmission, the dashboard surfaces a pending approval. The user's **Approve** click is the per-job approval; it is not reusable for another job.
+
+The goal is broad Flipper usability through **typed app/function adapters**, not an unrestricted remote shell. This lets Codex use installed Flipper apps as tools while retaining job correlation, STOP, audit, asset/region declarations, adapter verification, and explicit confirmation for higher-impact output.
+
+## Automatic adapter creation on app install
+
+`codex/src/app-watcher.mjs` checks Flipper inventory every five seconds by default (`S1R3N_APP_WATCH_MS` overrides it). A newly installed app triggers:
 
 ```text
-repository: Next-Flip/Momentum-Firmware
-branch: dev
-commit: d3f89dfe2ef6b01839201598e9be1590cba80322
-license: GPL-3.0
+Flipper inventory
+   -> Codex capability discovery
+   -> ADL adapter generation
+   -> schema/risk validation
+   -> staged content-addressed adapter
+   -> closed-loop device test when eligible
+   -> machine_verified adapter
+   -> point-and-click function button
 ```
 
-M3rMa1d changes are additive:
+Observe/local-state adapters may be auto-activated only after a real connected-device proof reports observed success. Physical-output/transmit adapters stay user-approved and remain subject to the ADL asset/region/frequency policy. Restricted functions are not promoted.
 
-- M3rMa1d S1r3n control application
-- MermaidLink UART integration
-- Codex intent and workflow interface
-- ADL typed capability registry
-- native Momentum/Flipper app discovery and adapters
-- Mermaid app group and shortcuts
-- Mermaid boot/splash/resources
-- Mermaid desktop and menu visuals
-- Mermaid themes, icons, animations, and status surfaces
-- S3-CAM companion status/camera integration
-- hardware tester, flasher, and proof system
+## Camera
 
-## User experience
+The GOOUUU board family documents the camera signals as matching the ESP32-S3-EYE map. This build therefore uses XCLK15, SIOD4, SIOC5, VSYNC6, HREF7, PCLK13, and D0..D7 = 11,9,8,10,12,18,17,16. The camera uses PSRAM-backed JPEG frame buffers and is exposed at `/api/camera.jpg` for visual verification.
 
-The normal Flipper menus remain available. M3rMa1d adds a point-and-click automation layer rather than removing native operation.
+## Build and flash
+
+```bash
+cd m3rma1d-s1r3n
+pio run
+pio run -t upload
+pio run -t uploadfs
+pio device monitor
+```
+
+`platformio.ini` is locked to 16 MB flash + 8 MB OPI PSRAM and uses a 16 MB partition table with OTA slots plus LittleFS.
+
+## Codex service
+
+The model/API key stays on the host, not in ESP32 flash. Configure the companion service with at least:
 
 ```text
-User intent / click
-       |
-       v
-M3rMa1d UI on Flipper
-       |
-       v
-Codex planner -> ADL resolver -> installed app/capability registry
-       |
-       v
-verified adapter / approved workflow / permitted frequency profile
-       |
-       v
-native Momentum or Flipper function
-       |
-       v
-result -> M3rMa1d UI
+OPENAI_API_KEY=...
+S1R3N_API_TOKEN=<32+ random chars>
+S1R3N_CONTROL_KEY=<32+ random chars>
+S1R3N_CORE_URL=http://<s3-ip>
+S1R3N_ALLOW_INSECURE_LOCAL_HTTP=true   # controlled private LAN commissioning only
+S1R3N_VISION_URL=http://<s3-ip>/api/camera.jpg
 ```
 
-Codex may discover installed applications, select native functions, generate bounded adapters/scripts, resolve permitted receive/transmit profiles for declared owned/lab assets, sequence apps, handle retries, and return results without requiring the user to navigate each underlying app manually.
+Then start it from `m3rma1d-s1r3n/codex` with `npm start`.
 
-Codex does not receive a raw shell or unrestricted CLI. STOP preempts execution. Restricted capabilities remain denied, and transmit operations remain governed by region, declared asset, active lease, and policy.
+## Current hardware truth
 
-## Momentum compatibility contract
-
-Every firmware build must prove:
-
-1. the pinned Momentum source revision is recorded;
-2. Momentum external applications are present after the M3rMa1d overlay is applied;
-3. Momentum resources and themes remain present;
-4. Mermaid apps/resources/themes are added without overwriting unrelated Momentum assets;
-5. the firmware builds from source under the applicable GPL-3.0 obligations;
-6. app discovery produces the native Momentum catalog plus Mermaid additions;
-7. existing Momentum apps can still be launched manually even when no Codex adapter exists;
-8. Codex execution occurs only through verified typed capability adapters;
-9. a Momentum upstream update is regression-tested before the M3rMa1d baseline is advanced.
-
-## Identity
-
-Momentum is the firmware foundation. M3rMa1d S1r3n is the integrated product experience:
-
-```text
-Momentum firmware + Momentum apps + Momentum themes
-                    +
-Mermaid apps + Mermaid theme pack + Codex/ADL autonomy
-                    +
-ESP32-S3-CAM companion
-                    =
-              M3rMa1d S1r3n
-```
-
-See `docs/MOMENTUM_BASELINE.md`, `docs/FLIPPER_THEME_IMPLEMENTATION_PLAN.md`, `adl/`, `codex/`, and `firmware/flipper-m3rma1d-s1r3n/`.
+The repository is configured for the single N16R8 CAM topology and the verified GOOUUU/ESP32-S3-EYE camera signal map. Software builds and static tests are separate from physical acceptance. Do not mark camera, UART, Flipper app execution, RF/IR output, or closed-loop adapter proof **PASS** until those checks have actually run on the assembled hardware.
