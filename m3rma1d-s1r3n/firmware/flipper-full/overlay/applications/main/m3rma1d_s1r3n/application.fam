@@ -4,6 +4,7 @@ App(
     apptype=FlipperAppType.APP,
     entry_point="m3rma1d_s1r3n_app",
     requires=["gui"],
-    stack_size=2 * 1024,
-    order=10,
+    stack_size=4 * 1024,
+    icon="A_Plugins_14",
+    order=0,
 )
