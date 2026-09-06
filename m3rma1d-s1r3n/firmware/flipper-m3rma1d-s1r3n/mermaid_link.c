@@ -274,6 +274,10 @@ bool mermaid_link_request_catalog(MermaidLink* link) {
     return send_frame(link, MermaidMsgCatalogRequest, NULL, 0);
 }
 
+bool mermaid_link_request_ready(MermaidLink* link) {
+    return send_frame(link, MermaidMsgReadyRequest, NULL, 0);
+}
+
 bool mermaid_link_send_stop(MermaidLink* link, uint32_t job_id) {
     uint8_t payload[4];
     write_u32(payload, job_id);
