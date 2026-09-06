@@ -1,67 +1,104 @@
 # M3rMa1d S1r3n
 
-M3rMa1d S1r3n is the 918 Technologies Codex/ADL control system for an operator-owned Flipper Zero.
+M3rMa1d S1r3n is a 918 Technologies Flipper Zero distribution built as an additive layer on top of Momentum Firmware. The user keeps the Momentum experience, apps, resources, and themes, while M3rMa1d adds Codex/ADL automation, Mermaid-native apps, MermaidLink control, and Mermaid visual themes.
 
-## Hardware inventory
+## Hardware
 
-- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 Core, camera removed
-- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 Vision node with OV3660
-- 3 x ESP32-C5 SuperMini safety nodes
-- 1 x ESP32-32E N4 CYD Deck, 2.8 inch ILI9341/XPT2046 touchscreen
+The active appliance is intentionally two-device:
+
+- 1 x GOOUUU ESP32-S3-CAM V1.5 N16R8 + OV3660
 - 1 x Flipper Zero
 
-## Non-negotiable physical boundary
+The S3-CAM is the companion controller and Codex bridge. The Flipper remains the user-facing point-and-click device.
 
-The **CYD Deck is the sole electrical connection to the Flipper GPIO header**. The production route is:
+## Firmware inheritance rule
 
-```text
-Codex host -> signed Core request -> three-C5 safety quorum -> CYD Deck -> Flipper Expansion UART/RPC
-```
+Momentum Firmware is the base, not something M3rMa1d replaces.
 
-The Core, Vision node, and C5 nodes have no direct Flipper GPIO route. `fallback_physical_route` is permanently `false`.
-
-CYD/Flipper wiring:
+Required release invariant:
 
 ```text
-CYD GPIO27 UART2 TX -> Flipper pin 14 RX
-CYD GPIO22 UART2 RX <- Flipper pin 13 TX
-CYD GND              <-> Flipper pin 18 GND
+M3rMa1d Flipper image = pinned Momentum base + all Momentum apps/resources/themes + Mermaid additions
 ```
 
-Power the CYD and Flipper independently. Do not join their 3.3 V or 5 V outputs.
+A M3rMa1d build must preserve every app, asset, menu feature, setting, and theme delivered by the pinned Momentum baseline unless a specific upstream item is impossible to build or has been explicitly excluded for a documented compatibility reason. Any such exclusion is a release blocker until recorded and approved.
 
-## Production host control plane
+Current pinned upstream baseline:
 
-The `codex/` service provides:
+```text
+repository: Next-Flip/Momentum-Firmware
+branch: dev
+commit: d3f89dfe2ef6b01839201598e9be1590cba80322
+license: GPL-3.0
+```
 
-- OpenAI Responses API structured planning into ADL 2.0;
-- deterministic authorization and route validation;
-- content-addressed typed Flipper adapters;
-- official Flipper Expansion RPC operation materialization;
-- SHA-256 artifact verification and signed chunk transfer;
-- HMAC-SHA256 Core request and response authentication;
-- nonce, timestamp, route, STOP, Deck, Flipper, and C5 readiness checks;
-- operator-evidence promotion for generated adapters and scripts;
-- owned-asset frequency profiles for future verified transmit adapters;
-- tamper-evident hash-chained audit records;
-- a real-hardware contract test for Core, all three C5 nodes, CYD, and Flipper.
+M3rMa1d changes are additive:
 
-There is no mock Core, simulated Flipper transport, dry-run execution path, console approval substitute, raw CLI adapter, or arbitrary command field in the production runtime.
+- M3rMa1d S1r3n control application
+- MermaidLink UART integration
+- Codex intent and workflow interface
+- ADL typed capability registry
+- native Momentum/Flipper app discovery and adapters
+- Mermaid app group and shortcuts
+- Mermaid boot/splash/resources
+- Mermaid desktop and menu visuals
+- Mermaid themes, icons, animations, and status surfaces
+- S3-CAM companion status/camera integration
+- hardware tester, flasher, and proof system
 
-## Execution policy
+## User experience
 
-Codex may plan and generate candidate declarative logic, but generated adapters and scripts are stored as `staged_pending_review`. They cannot execute until an identified operator promotes the exact SHA-256 and supplies the SHA-256 of physical test evidence. Generated adapter execution also defaults to disabled.
+The normal Flipper menus remain available. M3rMa1d adds a point-and-click automation layer rather than removing native operation.
 
-Bundled adapters currently cover only operations represented by the official Flipper RPC service catalog: system information, storage information/list/stat, app start/exit/load-file, GUI input, GPIO read, property read, and approved artifact staging.
+```text
+User intent / click
+       |
+       v
+M3rMa1d UI on Flipper
+       |
+       v
+Codex planner -> ADL resolver -> installed app/capability registry
+       |
+       v
+verified adapter / approved workflow / permitted frequency profile
+       |
+       v
+native Momentum or Flipper function
+       |
+       v
+result -> M3rMa1d UI
+```
 
-## Release status
+Codex may discover installed applications, select native functions, generate bounded adapters/scripts, resolve permitted receive/transmit profiles for declared owned/lab assets, sequence apps, handle retries, and return results without requiring the user to navigate each underlying app manually.
 
-The host control plane is a **production candidate**, not a released appliance. Deterministic CI and the real-hardware contract are separate gates. The project must not be merged or tagged as user-ready until:
+Codex does not receive a raw shell or unrestricted CLI. STOP preempts execution. Restricted capabilities remain denied, and transmit operations remain governed by region, declared asset, active lease, and policy.
 
-1. deterministic GitHub Actions gates pass on the final commit;
-2. production firmware exists for Core, Vision, all three ESP32-C5 nodes, and CYD;
-3. all firmware builds are reproducible from pinned toolchains;
-4. the real-hardware contract passes on the assembled system;
-5. touchscreen STOP/approval, UART electrical behavior, Expansion RPC, camera capture, C5 quorum loss, replay rejection, and power-failure behavior are physically recorded as PASS.
+## Momentum compatibility contract
 
-See `PRODUCTION_READINESS.md`, `docs/WIRING.md`, and `codex/README.md`.
+Every firmware build must prove:
+
+1. the pinned Momentum source revision is recorded;
+2. Momentum external applications are present after the M3rMa1d overlay is applied;
+3. Momentum resources and themes remain present;
+4. Mermaid apps/resources/themes are added without overwriting unrelated Momentum assets;
+5. the firmware builds from source under the applicable GPL-3.0 obligations;
+6. app discovery produces the native Momentum catalog plus Mermaid additions;
+7. existing Momentum apps can still be launched manually even when no Codex adapter exists;
+8. Codex execution occurs only through verified typed capability adapters;
+9. a Momentum upstream update is regression-tested before the M3rMa1d baseline is advanced.
+
+## Identity
+
+Momentum is the firmware foundation. M3rMa1d S1r3n is the integrated product experience:
+
+```text
+Momentum firmware + Momentum apps + Momentum themes
+                    +
+Mermaid apps + Mermaid theme pack + Codex/ADL autonomy
+                    +
+ESP32-S3-CAM companion
+                    =
+              M3rMa1d S1r3n
+```
+
+See `docs/MOMENTUM_BASELINE.md`, `docs/FLIPPER_THEME_IMPLEMENTATION_PLAN.md`, `adl/`, `codex/`, and `firmware/flipper-m3rma1d-s1r3n/`.
