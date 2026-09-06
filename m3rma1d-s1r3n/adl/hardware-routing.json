@@ -1,20 +1,24 @@
 {
-  "routing_version": "1.0",
+  "routing_version": "2.0-reduced",
   "logical_target": "flipper",
-  "physical_owner": "deck-cyd",
+  "physical_owner": "single-s3-cam",
   "bridge": {
     "interface": "uart",
-    "uart_port": 2,
     "baud": 230400,
     "format": "8N1",
-    "deck_rx_gpio": 22,
-    "deck_tx_gpio": 27,
+    "s3_tx_gpio": 1,
+    "s3_rx_gpio": 2,
     "flipper_tx_pin": 13,
     "flipper_rx_pin": 14,
     "ground_pin": 18,
     "power_connection": false
   },
-  "forbidden_direct_nodes": [
+  "required_nodes": [
+    "single-s3-cam",
+    "flipper-zero"
+  ],
+  "forbidden_fallback_nodes": [
+    "deck-cyd",
     "core-s3",
     "vision-s3cam",
     "c5-supermini-1",
