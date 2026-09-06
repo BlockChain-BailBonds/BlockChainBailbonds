@@ -1,0 +1,35 @@
+name: M3rMa1d S1r3n Single S3 CAM Firmware
+on:
+  push:
+    branches: [feat/m3rma1d-s1r3n-single-s3-cam]
+    paths: ['m3rma1d-s1r3n/firmware/single-s3-cam/**','.github/workflows/m3rma1d-single-s3-cam.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5
+          target: esp32s3
+          path: m3rma1d-s1r3n/firmware/single-s3-cam
+      - name: Package firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          B=m3rma1d-s1r3n/firmware/single-s3-cam/build
+          O=m3rma1d-single-s3-cam-output
+          mkdir -p "$O"
+          cp "$B"/*.bin "$O"/ || true
+          cp "$B"/*.elf "$O"/ || true
+          cp "$B"/flash_args "$O"/ || true
+          cp "$B"/flasher_args.json "$O"/ || true
+          cp "$B"/bootloader/bootloader.bin "$O"/
+          cp "$B"/partition_table/partition-table.bin "$O"/
+          (cd "$O" && sha256sum * > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: M3rMa1d-S1r3n-single-S3-N16R8-CAM
+          path: m3rma1d-single-s3-cam-output/
+          if-no-files-found: error
