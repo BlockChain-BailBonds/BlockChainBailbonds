@@ -1,8 +1,12 @@
 import path from 'node:path';
 import {mkdir} from 'node:fs/promises';
 import {executeRun, resolveRun, compileRun, validateRun} from '../../adl/codex-runner.mjs';
-import {atomicWriteJson, invariant, nowIso, sanitizeId} from './utils.mjs';
+import {atomicWriteJson, invariant, nowIso, sanitizeId, sha256, stableJson} from './utils.mjs';
 import {ExecutionMaterializer} from './materializer.mjs';
+
+const ROUTE = Object.freeze({logical_target: 'flipper', physical_owner: 's3-cam', fallback_physical_route: false});
+const SHA256 = /^[a-f0-9]{64}$/;
+const RISK = Object.freeze({observe: 0, local_state: 1, physical_output: 2, transmit: 3, restricted: 99});
 
 function normalizeInstalledApp(raw) {
   if (typeof raw === 'string') return {name: raw, id: raw.trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '_').slice(0, 64)};
@@ -10,6 +14,63 @@ function normalizeInstalledApp(raw) {
   const name = String(raw.display_name ?? raw.name ?? raw.app_name ?? raw.id ?? '').trim();
   const id = String(raw.app_id ?? raw.id ?? name).trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '_').slice(0, 64);
   return name && id ? {...raw, name, id} : null;
+}
+
+function candidateCanSelfTest(staged) {
+  const adapter = staged?.value;
+  if (!adapter || !['observe', 'local_state'].includes(adapter.risk)) return false;
+  if ((adapter.arguments_schema?.required ?? []).length) return false;
+  if ((adapter.requires?.artifacts ?? []).length) return false;
+  if ((adapter.requires?.libraries ?? []).length) return false;
+  if (adapter.requires?.frequency_profile) return false;
+  if (adapter.operations.some((op) => op.op === 'deck_confirm' || op.op === 'artifact_stage' || op.op === 'storage_write')) return false;
+  return !JSON.stringify(adapter.operations).includes('${');
+}
+
+function validationJob(staged, appId, functionName) {
+  const adapter = staged.value;
+  const programId = `verify:${adapter.adapter_id}:${staged.sha256.slice(0, 12)}`;
+  const flipperProgram = {
+    version: 1,
+    program_id: programId,
+    adapter: {
+      id: adapter.adapter_id,
+      sha256: staged.sha256,
+      origin: 'generated',
+      verification_status: 'device_testing',
+    },
+    route: {...ROUTE},
+    risk: adapter.risk,
+    approval: 'auto',
+    timeout_ms: 15000,
+    operations: structuredClone(adapter.operations),
+    artifacts: [],
+    validation: {
+      mode: 'closed_loop_adapter_test',
+      app_id: appId,
+      function: functionName,
+      require_observed_success: true,
+    },
+  };
+  flipperProgram.sha256 = sha256(stableJson(flipperProgram));
+  return {
+    target: 'flipper-link',
+    job_id: programId,
+    route: {...ROUTE},
+    risk: adapter.risk,
+    approval: 'auto',
+    flipper_program: flipperProgram,
+  };
+}
+
+function validateDeviceProof(result, jobId) {
+  invariant(result?.job_id === jobId, 'device-test result correlation mismatch');
+  invariant(result?.code === 0, `device-test failed with code ${result?.code ?? 'missing'}`);
+  invariant(result?.observed_success === true, 'device-test did not report observed success');
+  invariant(SHA256.test(result?.evidence_sha256 ?? ''), 'device-test evidence SHA-256 missing');
+  invariant(result?.before_state && typeof result.before_state === 'object', 'device-test before_state missing');
+  invariant(result?.after_state && typeof result.after_state === 'object', 'device-test after_state missing');
+  return result;
 }
 
 export class MermaidCodexService {
@@ -78,6 +139,34 @@ export class MermaidCodexService {
     return readiness;
   }
 
+  async #selfTestGeneratedAdapter({app, capability, staged}) {
+    if (!candidateCanSelfTest(staged)) {
+      return {tested: false, passed: false, reason: 'candidate requires arguments, artifacts, libraries, frequency, write, or approval'};
+    }
+    const readiness = await this.readiness({requireStopCleared: true});
+    if (!readiness.ready) {
+      return {tested: false, passed: false, reason: `hardware not ready: ${readiness.reasons.join('; ')}`};
+    }
+    const job = validationJob(staged, app.id, capability.name);
+    await this.audit.write({event: 'app.adapter.device_test.started', app_id: app.id, function: capability.name, job_id: job.job_id, adapter_sha256: staged.sha256});
+    try {
+      const result = validateDeviceProof(await this.transport.execute(job, Date.now() + 15000), job.job_id);
+      await this.audit.write({
+        event: 'app.adapter.device_test.passed',
+        app_id: app.id,
+        function: capability.name,
+        job_id: job.job_id,
+        evidence_sha256: result.evidence_sha256,
+        before_state: result.before_state,
+        after_state: result.after_state,
+      });
+      return {tested: true, passed: true, result};
+    } catch (error) {
+      await this.audit.write({event: 'app.adapter.device_test.failed', app_id: app.id, function: capability.name, job_id: job.job_id, error: error.message});
+      return {tested: true, passed: false, reason: error.message};
+    }
+  }
+
   async reconcileInstalledApps({inventory = null} = {}) {
     const current = inventory ?? await this.transport.inventory();
     invariant(current?.flipper?.physical_owner === 's3-cam', 'inventory route owner mismatch');
@@ -86,64 +175,135 @@ export class MermaidCodexService {
 
     const before = await this.catalog.snapshot();
     const previousIds = new Set((before.installed_apps ?? []).map(normalizeInstalledApp).filter(Boolean).map((app) => app.id));
-    await this.catalog.ingestInventory(current);
-
     const installed = current.flipper.apps.map(normalizeInstalledApp).filter(Boolean);
     const integrated = [];
     const staged = [];
     const failed = [];
+    const discovered = [];
 
     for (const app of installed) {
       if (previousIds.has(app.id)) continue;
       await this.audit.write({event: 'app.discovered', app});
 
-      const openStep = {
-        id: `auto_${app.id}_open`,
-        kind: 'app',
-        app_id: app.id,
-        function: 'open',
-        arguments: {},
-      };
+      let plan;
       try {
-        const candidate = await this.generator.generateAdapter({
-          run: {
-            adl_version: '2.0',
-            run_id: `auto-integrate-${app.id}`,
-            target: 'flipper',
-            authorization: {
-              scope: 'owned_asset',
-              asset_id: 'local-flipper',
-              purpose: `integrate newly installed app ${app.name}`,
-              region_profile: this.config?.policy?.defaultRegionProfile ?? 'US',
-              operator_id: 'codex-auto-integrator',
-            },
-            resolution: {
-              source_policy: 'local_only',
-              allow_generate_adapter: true,
-              allow_generate_script: true,
-              allow_frequency_resolution: true,
-            },
-          },
-          step: openStep,
-        });
-        const stagedArtifact = await this.artifacts.verifyAndStage(candidate, 'local_only');
-        const risk = stagedArtifact.value?.risk;
-        if (risk === 'observe' || risk === 'local_state') {
-          const adapter = await this.catalog.registerAutoGeneratedAdapter(app.id, 'open', stagedArtifact);
-          integrated.push({app_id: app.id, adapter_id: adapter.adapter_id, risk: adapter.risk});
-          await this.audit.write({event: 'app.adapter.auto_verified', app_id: app.id, adapter_id: adapter.adapter_id, risk: adapter.risk});
-        } else {
-          await this.catalog.registerGeneratedAdapter(app.id, 'open', stagedArtifact);
-          staged.push({app_id: app.id, adapter_id: stagedArtifact.value.adapter_id, risk});
-          await this.audit.write({event: 'app.adapter.staged', app_id: app.id, adapter_id: stagedArtifact.value.adapter_id, risk});
-        }
+        const discovery = await this.generator.discoverAppCapabilities({app, inventory: current});
+        plan = discovery.value;
+        invariant(plan?.app_id === app.id, `capability plan app mismatch for ${app.id}`);
+        invariant(Array.isArray(plan.functions) && plan.functions.length > 0, `no capability functions discovered for ${app.id}`);
+        await this.audit.write({event: 'app.capabilities.discovered', app_id: app.id, response_id: discovery.response_id, functions: plan.functions});
       } catch (error) {
-        failed.push({app_id: app.id, error: error.message});
-        await this.audit.write({event: 'app.adapter.failed', app_id: app.id, error: error.message});
+        failed.push({app_id: app.id, phase: 'discovery', error: error.message});
+        await this.audit.write({event: 'app.capabilities.failed', app_id: app.id, error: error.message});
+        continue;
+      }
+
+      discovered.push({app_id: app.id, functions: plan.functions.map((fn) => fn.name)});
+      const seenFunctions = new Set();
+      for (const capability of plan.functions) {
+        if (!capability?.name || seenFunctions.has(capability.name)) continue;
+        seenFunctions.add(capability.name);
+        if (capability.confidence === 'unknown' || capability.risk === 'restricted') {
+          staged.push({app_id: app.id, function: capability.name, risk: capability.risk, status: 'not_executable', reason: capability.confidence});
+          continue;
+        }
+
+        const step = {
+          id: `auto_${app.id}_${capability.name}`.slice(0, 64),
+          kind: 'app',
+          app_id: app.id,
+          function: capability.name,
+          arguments: {},
+          capability_description: capability.description,
+          capability_evidence: capability.evidence,
+          capability_risk_hint: capability.risk,
+          capability_arguments_hint: capability.arguments_hint ?? {},
+        };
+        try {
+          const candidate = await this.generator.generateAdapter({
+            run: {
+              adl_version: '2.0',
+              run_id: `auto-integrate-${app.id}`,
+              target: 'flipper',
+              authorization: {
+                scope: 'owned_asset',
+                asset_id: 'local-flipper',
+                purpose: `integrate newly installed app ${app.name}`,
+                region_profile: this.config?.policy?.defaultRegionProfile ?? 'US',
+                operator_id: 'codex-auto-integrator',
+              },
+              resolution: {
+                source_policy: 'local_only',
+                allow_generate_adapter: true,
+                allow_generate_script: true,
+                allow_frequency_resolution: true,
+              },
+            },
+            step,
+          });
+          const stagedArtifact = await this.artifacts.verifyAndStage(candidate, 'local_only');
+          const risk = stagedArtifact.value?.risk;
+          invariant(RISK[risk] !== undefined, `generated adapter has unknown risk: ${risk}`);
+          invariant(RISK[risk] >= RISK[capability.risk], `generated adapter understates discovered risk for ${app.id}.${capability.name}`);
+
+          await this.catalog.registerGeneratedAdapter(app.id, capability.name, stagedArtifact);
+          await this.audit.write({event: 'app.adapter.schema_verified', app_id: app.id, function: capability.name, adapter_id: stagedArtifact.value.adapter_id, risk, sha256: stagedArtifact.sha256});
+
+          if (risk === 'observe' || risk === 'local_state') {
+            const deviceTest = await this.#selfTestGeneratedAdapter({app, capability, staged: stagedArtifact});
+            if (deviceTest.passed) {
+              const adapter = await this.catalog.registerAutoGeneratedAdapter(app.id, capability.name, stagedArtifact);
+              integrated.push({
+                app_id: app.id,
+                function: capability.name,
+                adapter_id: adapter.adapter_id,
+                risk: adapter.risk,
+                verification_status: 'machine_verified',
+                evidence_sha256: deviceTest.result.evidence_sha256,
+              });
+              await this.audit.write({
+                event: 'app.adapter.machine_verified',
+                app_id: app.id,
+                function: capability.name,
+                adapter_id: adapter.adapter_id,
+                risk: adapter.risk,
+                evidence_sha256: deviceTest.result.evidence_sha256,
+              });
+            } else {
+              staged.push({
+                app_id: app.id,
+                function: capability.name,
+                adapter_id: stagedArtifact.value.adapter_id,
+                risk,
+                status: deviceTest.tested ? 'quarantined_after_test_failure' : 'pending_device_test',
+                reason: deviceTest.reason,
+              });
+            }
+          } else {
+            staged.push({
+              app_id: app.id,
+              function: capability.name,
+              adapter_id: stagedArtifact.value.adapter_id,
+              risk,
+              status: 'approval_required',
+            });
+          }
+        } catch (error) {
+          failed.push({app_id: app.id, function: capability.name, phase: 'adapter', error: error.message});
+          await this.audit.write({event: 'app.adapter.failed', app_id: app.id, function: capability.name, error: error.message});
+        }
       }
     }
 
-    return {installed: installed.length, new_apps: integrated.length + staged.length + failed.length, integrated, staged, failed};
+    await this.catalog.ingestInventory(current);
+    return {
+      installed: installed.length,
+      new_apps: discovered.length,
+      discovered,
+      integrated,
+      staged,
+      failed,
+    };
   }
 
   async inventory({refresh = false} = {}) {
@@ -318,15 +478,10 @@ export class MermaidCodexService {
 
   async clearStop({authenticated = false, reason = 'operator resume'} = {}) {
     invariant(authenticated, 'STOP clear requires authenticated operator intent');
-    const readiness = await this.assertReady({requireStopCleared: false});
+    await this.assertReady({requireStopCleared: false});
     const remote = await this.transport.clearStop(reason);
     invariant(remote?.asserted === false, 'S3-CAM did not confirm STOP clear');
-    const local = await this.stop.clear({
-      authenticated: true,
-      deckOnline: true,
-      safetyHealthy: true,
-      reason,
-    });
+    const local = await this.stop.clear({authenticated: true, deckOnline: true, safetyHealthy: true, reason});
     await this.audit.write({event: 'stop.cleared', reason, remote});
     return {local, remote};
   }
