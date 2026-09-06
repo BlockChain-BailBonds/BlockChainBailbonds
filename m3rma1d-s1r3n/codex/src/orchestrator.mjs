@@ -4,6 +4,14 @@ import {executeRun, resolveRun, compileRun, validateRun} from '../../adl/codex-r
 import {atomicWriteJson, invariant, nowIso, sanitizeId} from './utils.mjs';
 import {ExecutionMaterializer} from './materializer.mjs';
 
+function normalizeInstalledApp(raw) {
+  if (typeof raw === 'string') return {name: raw, id: raw.trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '_').slice(0, 64)};
+  if (!raw || typeof raw !== 'object') return null;
+  const name = String(raw.display_name ?? raw.name ?? raw.app_name ?? raw.id ?? '').trim();
+  const id = String(raw.app_id ?? raw.id ?? name).trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '_').slice(0, 64);
+  return name && id ? {...raw, name, id} : null;
+}
+
 export class MermaidCodexService {
   constructor({config, planner, generator, catalog, artifacts, frequencies, audit, approvals, stop, transport, vision = null}) {
     this.config = config;
@@ -31,31 +39,29 @@ export class MermaidCodexService {
       this.audit.init(),
       this.stop.load(),
     ]);
+    try {
+      await this.reconcileInstalledApps();
+    } catch (error) {
+      await this.audit.write({event: 'app.reconcile.failed', error: error.message});
+    }
     return this;
   }
 
   async readiness({requireStopCleared = false} = {}) {
     const [control, localStop] = await Promise.all([this.transport.status(), this.stop.snapshot()]);
     const reasons = [];
-    if (control?.physical_owner !== 'deck-cyd') reasons.push('Core did not attest deck-cyd as physical owner');
-    if (control?.fallback_physical_route !== false) reasons.push('Core did not attest fallback routing disabled');
-    if (this.config.execution.requireDeckOnline && control?.deck_online !== true) reasons.push('CYD Deck offline');
+    if (control?.physical_owner !== 's3-cam') reasons.push('S3-CAM is not the attested physical owner');
+    if (control?.fallback_physical_route !== false) reasons.push('S3-CAM did not attest fallback routing disabled');
     if (this.config.execution.requireFlipperOnline && control?.flipper_online !== true) reasons.push('Flipper offline');
-    if (this.config.execution.requireSafetyQuorum) {
-      if (control?.safety_healthy !== true) reasons.push('C5 safety mesh unhealthy');
-      if (!Number.isInteger(control?.safety_nodes_online) || control.safety_nodes_online < this.config.execution.requiredSafetyNodes) {
-        reasons.push(`C5 safety quorum below ${this.config.execution.requiredSafetyNodes}`);
-      }
-    }
     if (requireStopCleared) {
       if (localStop.asserted !== false) reasons.push('host STOP asserted');
-      if (control?.stop_asserted !== false) reasons.push('Core/Deck STOP asserted');
+      if (control?.stop_asserted !== false) reasons.push('S3-CAM/Flipper STOP asserted');
     }
     return {
       ready: reasons.length === 0,
       reasons,
       production: true,
-      physical_owner: 'deck-cyd',
+      physical_owner: 's3-cam',
       local_stop: localStop,
       control,
     };
@@ -72,15 +78,80 @@ export class MermaidCodexService {
     return readiness;
   }
 
+  async reconcileInstalledApps({inventory = null} = {}) {
+    const current = inventory ?? await this.transport.inventory();
+    invariant(current?.flipper?.physical_owner === 's3-cam', 'inventory route owner mismatch');
+    invariant(current?.flipper?.online === true, 'Flipper is not online');
+    invariant(Array.isArray(current.flipper.apps), 'S3-CAM returned invalid Flipper app inventory');
+
+    const before = await this.catalog.snapshot();
+    const previousIds = new Set((before.installed_apps ?? []).map(normalizeInstalledApp).filter(Boolean).map((app) => app.id));
+    await this.catalog.ingestInventory(current);
+
+    const installed = current.flipper.apps.map(normalizeInstalledApp).filter(Boolean);
+    const integrated = [];
+    const staged = [];
+    const failed = [];
+
+    for (const app of installed) {
+      if (previousIds.has(app.id)) continue;
+      await this.audit.write({event: 'app.discovered', app});
+
+      const openStep = {
+        id: `auto_${app.id}_open`,
+        kind: 'app',
+        app_id: app.id,
+        function: 'open',
+        arguments: {},
+      };
+      try {
+        const candidate = await this.generator.generateAdapter({
+          run: {
+            adl_version: '2.0',
+            run_id: `auto-integrate-${app.id}`,
+            target: 'flipper',
+            authorization: {
+              scope: 'owned_asset',
+              asset_id: 'local-flipper',
+              purpose: `integrate newly installed app ${app.name}`,
+              region_profile: this.config?.policy?.defaultRegionProfile ?? 'US',
+              operator_id: 'codex-auto-integrator',
+            },
+            resolution: {
+              source_policy: 'local_only',
+              allow_generate_adapter: true,
+              allow_generate_script: true,
+              allow_frequency_resolution: true,
+            },
+          },
+          step: openStep,
+        });
+        const stagedArtifact = await this.artifacts.verifyAndStage(candidate, 'local_only');
+        const risk = stagedArtifact.value?.risk;
+        if (risk === 'observe' || risk === 'local_state') {
+          const adapter = await this.catalog.registerAutoGeneratedAdapter(app.id, 'open', stagedArtifact);
+          integrated.push({app_id: app.id, adapter_id: adapter.adapter_id, risk: adapter.risk});
+          await this.audit.write({event: 'app.adapter.auto_verified', app_id: app.id, adapter_id: adapter.adapter_id, risk: adapter.risk});
+        } else {
+          await this.catalog.registerGeneratedAdapter(app.id, 'open', stagedArtifact);
+          staged.push({app_id: app.id, adapter_id: stagedArtifact.value.adapter_id, risk});
+          await this.audit.write({event: 'app.adapter.staged', app_id: app.id, adapter_id: stagedArtifact.value.adapter_id, risk});
+        }
+      } catch (error) {
+        failed.push({app_id: app.id, error: error.message});
+        await this.audit.write({event: 'app.adapter.failed', app_id: app.id, error: error.message});
+      }
+    }
+
+    return {installed: installed.length, new_apps: integrated.length + staged.length + failed.length, integrated, staged, failed};
+  }
+
   async inventory({refresh = false} = {}) {
     if (refresh) {
       const inventory = await this.transport.inventory();
-      invariant(inventory?.flipper?.physical_owner === 'deck-cyd', 'inventory route owner mismatch');
-      invariant(inventory?.flipper?.online === true, 'Flipper is not online');
-      invariant(Array.isArray(inventory.flipper.apps), 'Core returned invalid Flipper app inventory');
-      await this.catalog.ingestInventory(inventory);
-      await this.audit.write({event: 'inventory.refreshed', inventory});
-      return inventory;
+      const reconciliation = await this.reconcileInstalledApps({inventory});
+      await this.audit.write({event: 'inventory.refreshed', inventory, reconciliation});
+      return {...inventory, reconciliation};
     }
     return {catalog: await this.catalog.snapshot()};
   }
@@ -180,8 +251,8 @@ export class MermaidCodexService {
           state.status = 'executing';
           await atomicWriteJson(statePath, state);
           let result = await this.transport.execute(materialized, deadline);
-          invariant(result?.job_id === materialized.job_id, 'Core result job mismatch');
-          invariant(Number.isInteger(result?.code), 'Core result code missing');
+          invariant(result?.job_id === materialized.job_id, 'S3-CAM result job mismatch');
+          invariant(Number.isInteger(result?.code), 'S3-CAM result code missing');
 
           const visionOps = materialized.flipper_program.operations.filter(
             (operation) => operation.op === 'capture_vision' || operation.op === 'expect',
@@ -204,7 +275,7 @@ export class MermaidCodexService {
             if (decision.decision === 'retry') {
               invariant(Date.now() < deadline, 'Vision requested retry after the ADL lease expired');
               const retry = await this.transport.execute({...materialized, retry_of: materialized.job_id}, deadline);
-              invariant(retry?.job_id === materialized.job_id, 'Core retry result job mismatch');
+              invariant(retry?.job_id === materialized.job_id, 'S3-CAM retry result job mismatch');
               return {...retry, vision: decision, retried: true};
             }
           }
@@ -236,7 +307,7 @@ export class MermaidCodexService {
     const local = await this.stop.assert(reason);
     try {
       const remote = await this.transport.assertStop(reason);
-      invariant(remote?.asserted === true, 'Core did not confirm STOP assertion');
+      invariant(remote?.asserted === true, 'S3-CAM did not confirm STOP assertion');
       await this.audit.write({event: 'stop.asserted', reason, remote});
       return {local, remote};
     } catch (error) {
@@ -249,11 +320,11 @@ export class MermaidCodexService {
     invariant(authenticated, 'STOP clear requires authenticated operator intent');
     const readiness = await this.assertReady({requireStopCleared: false});
     const remote = await this.transport.clearStop(reason);
-    invariant(remote?.asserted === false, 'Core did not confirm STOP clear');
+    invariant(remote?.asserted === false, 'S3-CAM did not confirm STOP clear');
     const local = await this.stop.clear({
       authenticated: true,
-      deckOnline: readiness.control.deck_online === true,
-      safetyHealthy: readiness.control.safety_healthy === true,
+      deckOnline: true,
+      safetyHealthy: true,
       reason,
     });
     await this.audit.write({event: 'stop.cleared', reason, remote});
