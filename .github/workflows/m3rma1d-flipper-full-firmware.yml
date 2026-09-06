@@ -1,4 +1,4 @@
-name: M3rMa1d S1r3n Full Flipper Firmware
+name: M3rMa1d S1r3n Full Themed Flipper Firmware
 
 on:
   push:
@@ -32,25 +32,105 @@ jobs:
           cp -a m3rma1d-s1r3n/firmware/flipper-full/overlay/. upstream/
           cp m3rma1d-s1r3n/firmware/flipper-full/fbt_options_local.py upstream/fbt_options_local.py
 
-      - name: Build full updater package
+      - name: Generate Mermaid Siren splash assets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --user pillow
+          mkdir -p upstream/assets/slideshow/mermaid_siren
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw, ImageFont
+          from pathlib import Path
+
+          out = Path('upstream/assets/slideshow/mermaid_siren')
+          font = ImageFont.load_default()
+
+          for idx in range(3):
+              im = Image.new('1', (128, 64), 0)
+              d = ImageDraw.Draw(im)
+              # tide bands
+              for y in (3, 55):
+                  for x in range(-8, 136, 8):
+                      off = 2 if ((x // 8 + idx) & 1) else 0
+                      d.line((x, y + off, x + 4, y + 2 - off), fill=1)
+                      d.line((x + 4, y + 2 - off, x + 8, y + off), fill=1)
+              d.text((15, 14), 'M3rMa1d S1r3n', font=font, fill=1)
+              d.text((25, 27), '918 TECHNOLOGIES', font=font, fill=1)
+              d.text((28, 39), 'SIREN ONLINE', font=font, fill=1)
+              # minimalist mermaid tail glyph
+              ox = 104 + idx
+              oy = 15
+              d.line((ox, oy, ox + 7, oy + 5), fill=1)
+              d.line((ox + 7, oy + 5, ox + 14, oy), fill=1)
+              d.line((ox + 7, oy + 5, ox + 7, oy + 15), fill=1)
+              d.line((ox + 7, oy + 15, ox + 2, oy + 21), fill=1)
+              d.line((ox + 7, oy + 15, ox + 12, oy + 21), fill=1)
+              im.save(out / f'frame_{idx:02d}.png', optimize=True)
+          PY
+
+      - name: Apply global Mermaid UI branding
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          loader = Path('upstream/applications/services/loader/loader_menu.c')
+          s = loader.read_text()
+          s = s.replace('app->primary_menu, "Settings", &A_Settings_14', 'app->primary_menu, "Siren Settings", &A_Settings_14')
+          s = s.replace('LOADER_APPLICATIONS_NAME,\n        &A_Plugins_14', '"Dive Apps",\n        &A_Plugins_14')
+          loader.write_text(s)
+
+          about = Path('upstream/applications/settings/about/about.c')
+          s = about.read_text()
+          s = s.replace('dialog_message_set_header(message, "FW Version Info:",', 'dialog_message_set_header(message, "M3rMa1d S1r3n FW:",')
+          s = s.replace('"Product: %s\\n"\n        "Model: %s",', '"M3rMa1d S1r3n\\nProduct: %s\\n"\n        "Model: %s",')
+          about.write_text(s)
+          PY
+
+      - name: Build full themed updater package
         shell: bash
         working-directory: upstream
         run: |
           set -euxo pipefail
           ./fbt COMPACT=1 DEBUG=0 updater_package copro_dist
 
-      - name: Stage flashable outputs
+      - name: Verify Mermaid integration
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p M3rMa1d-S1r3n-Flipper-Firmware
-          find upstream/dist -type f \( -name '*.tgz' -o -name '*.dfu' -o -name '*.bin' -o -name '*.elf' -o -name '*.json' \) -print -exec cp '{}' M3rMa1d-S1r3n-Flipper-Firmware/ \;
-          test -n "$(find M3rMa1d-S1r3n-Flipper-Firmware -type f -name '*.tgz' -print -quit)"
-          (cd M3rMa1d-S1r3n-Flipper-Firmware && sha256sum * > SHA256SUMS.txt)
+          grep -R "M3rMa1d S1r3n" upstream/build/f7-firmware-C/applications upstream/build/f7-firmware-C/firmware.json
+          grep -R "m3rma1d_s1r3n" upstream/build/f7-firmware-C/applications
+          test -f upstream/dist/f7-C/f7-update-m3rma1d-s1r3n/splash.bin
+          test -f upstream/dist/f7-C/f7-update-m3rma1d-s1r3n/firmware.dfu
+          test -f upstream/dist/f7-C/f7-update-m3rma1d-s1r3n/update.fuf
+          strings upstream/build/f7-firmware-C/firmware.bin | grep -F "SIREN COMMAND DECK"
+          strings upstream/build/f7-firmware-C/firmware.bin | grep -F "M3RMA1D_S1R3N"
+          strings upstream/build/f7-firmware-C/firmware.bin | grep -F "Siren Settings"
 
-      - name: Upload full firmware artifact
+      - name: Stage complete flash and update outputs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p M3rMa1d-S1r3n-Flipper-Firmware/full-update
+          cp -a upstream/dist/f7-C/f7-update-m3rma1d-s1r3n/. M3rMa1d-S1r3n-Flipper-Firmware/full-update/
+          find upstream/dist/f7-C -maxdepth 1 -type f \( -name '*.tgz' -o -name '*.dfu' -o -name '*.bin' -o -name '*.elf' -o -name '*.json' \) -print -exec cp '{}' M3rMa1d-S1r3n-Flipper-Firmware/ \;
+          cat > M3rMa1d-S1r3n-Flipper-Firmware/THEME_MANIFEST.txt <<'EOF'
+          M3rMa1d S1r3n themed firmware
+          =================================
+          Boot target: M3rMa1d S1r3n Command Deck
+          Built-in app: M3rMa1d S1r3n
+          Main menu branding: Siren Settings / Dive Apps
+          Update splash: Mermaid Siren animated 3-frame splash
+          Command Deck pages: Home / ESP32-S3 / OV3660 / Siren Safety / About
+          Machine ID: M3RMA1D_S1R3N
+          Safety default: STOP asserted
+          EOF
+          (cd M3rMa1d-S1r3n-Flipper-Firmware && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+
+      - name: Upload full themed firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: M3rMa1d-S1r3n-Flipper-Zero-Firmware
+          name: M3rMa1d-S1r3n-Flipper-Zero-THEMED-Firmware
           path: M3rMa1d-S1r3n-Flipper-Firmware/
           if-no-files-found: error
