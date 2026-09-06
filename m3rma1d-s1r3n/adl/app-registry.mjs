@@ -3,6 +3,7 @@
 
 const ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const RISKS = new Set(['observe', 'local_state', 'physical_output', 'transmit', 'restricted']);
+const VERIFIED = new Set(['verified', 'operator_verified', 'machine_verified']);
 
 function assertId(value, name) {
   if (typeof value !== 'string' || !ID.test(value)) throw new Error(`invalid ${name}`);
@@ -25,7 +26,8 @@ export class AppRegistry {
     assertId(adapter.function, 'adapter.function');
     if (!RISKS.has(adapter.risk)) throw new Error(`invalid adapter risk: ${adapter.adapter_id}`);
     if (!['bundled', 'pinned', 'generated'].includes(adapter.origin)) throw new Error(`invalid adapter origin: ${adapter.adapter_id}`);
-    if (!['verified', 'operator_verified', 'staged'].includes(adapter.verification_status)) throw new Error(`invalid adapter verification: ${adapter.adapter_id}`);
+    if (![...VERIFIED, 'staged'].includes(adapter.verification_status)) throw new Error(`invalid adapter verification: ${adapter.adapter_id}`);
+    if (adapter.autonomous_safe !== undefined && typeof adapter.autonomous_safe !== 'boolean') throw new Error(`invalid autonomous_safe: ${adapter.adapter_id}`);
     this.adapters.set(adapter.adapter_id, structuredClone(adapter));
   }
 
@@ -85,8 +87,9 @@ export class AppRegistry {
       const adapter = fn.adapter_id ? this.adapters.get(fn.adapter_id) : null;
       return [name, {
         risk: fn.risk,
-        status: !fn.adapter_id ? 'needs_adapter' : adapter?.verification_status === 'verified' || adapter?.verification_status === 'operator_verified' ? 'ready' : 'blocked',
+        status: !fn.adapter_id ? 'needs_adapter' : VERIFIED.has(adapter?.verification_status) ? 'ready' : 'blocked',
         adapter_id: fn.adapter_id ?? null,
+        autonomous_safe: Boolean(adapter?.autonomous_safe),
       }];
     }));
     return { app_id: app.app_id, display_name: app.display_name, launch: app.launch, discovered: app.discovered, functions };
@@ -106,7 +109,7 @@ export class AppRegistry {
     const fn = app?.functions?.[functionName];
     if (!fn?.adapter_id) return null;
     const adapter = this.adapters.get(fn.adapter_id);
-    if (!adapter || !['verified', 'operator_verified'].includes(adapter.verification_status)) return null;
+    if (!adapter || !VERIFIED.has(adapter.verification_status)) return null;
     return {
       app_id: appId,
       function: functionName,
@@ -123,11 +126,18 @@ export class AppRegistry {
   }
 
   async registerGeneratedAdapter(appId, functionName, staged) {
-    if (staged?.verification_status !== 'operator_verified') {
-      throw new Error('generated adapter must be operator verified before registration');
+    if (!['operator_verified', 'machine_verified'].includes(staged?.verification_status)) {
+      throw new Error('generated adapter must be machine-verified or operator-verified before registration');
     }
     const adapter = staged.adapter;
-    this.registerAdapter({ ...adapter, app_id: appId, function: functionName, origin: 'generated', verification_status: 'operator_verified' });
+    this.registerAdapter({
+      ...adapter,
+      app_id: appId,
+      function: functionName,
+      origin: 'generated',
+      verification_status: staged.verification_status,
+      autonomous_safe: Boolean(staged.autonomous_safe ?? adapter.autonomous_safe),
+    });
     const app = this.apps.get(appId) ?? { app_id: appId, display_name: appId, launch: null, discovered: false, functions: {} };
     app.functions[functionName] = { ...(app.functions[functionName] ?? {}), risk: adapter.risk, adapter_id: adapter.adapter_id };
     this.apps.set(appId, app);
@@ -140,10 +150,10 @@ export class AppRegistry {
   }
 
   async registerGeneratedScript(scriptId, staged) {
-    if (staged?.verification_status !== 'operator_verified') {
-      throw new Error('generated script must be operator verified before registration');
+    if (!['operator_verified', 'machine_verified'].includes(staged?.verification_status)) {
+      throw new Error('generated script must be machine-verified or operator-verified before registration');
     }
-    this.registerScript({ ...staged.script, script_id: scriptId, verification_status: 'operator_verified' });
+    this.registerScript({ ...staged.script, script_id: scriptId, verification_status: staged.verification_status });
   }
 }
 
@@ -171,12 +181,12 @@ export const bundledManifestSet = [
 ];
 
 export const bundledAdapters = [
-  { adapter_id: 'system.help', app_id: 'system', function: 'help', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'system.device_info', app_id: 'system', function: 'device_info', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'system.storage_info', app_id: 'system', function: 'storage_info', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'system.loader_list', app_id: 'system', function: 'loader_list', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'loader.list', app_id: 'loader', function: 'list', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'loader.info', app_id: 'loader', function: 'info', risk: 'observe', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'loader.open_registered', app_id: 'loader', function: 'open_registered', risk: 'local_state', origin: 'bundled', verification_status: 'verified' },
-  { adapter_id: 'loader.close', app_id: 'loader', function: 'close', risk: 'local_state', origin: 'bundled', verification_status: 'verified' },
+  { adapter_id: 'system.help', app_id: 'system', function: 'help', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'system.device_info', app_id: 'system', function: 'device_info', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'system.storage_info', app_id: 'system', function: 'storage_info', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'system.loader_list', app_id: 'system', function: 'loader_list', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'loader.list', app_id: 'loader', function: 'list', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'loader.info', app_id: 'loader', function: 'info', risk: 'observe', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'loader.open_registered', app_id: 'loader', function: 'open_registered', risk: 'local_state', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
+  { adapter_id: 'loader.close', app_id: 'loader', function: 'close', risk: 'local_state', origin: 'bundled', verification_status: 'verified', autonomous_safe: true },
 ];
