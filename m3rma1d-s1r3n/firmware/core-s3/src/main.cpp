@@ -68,12 +68,7 @@ void setup() {
     mermaid.setExecutionAuthorized(false);
     mermaid.assertStop();
 
-    const CatalogSummary catalog = {
-        .total = 0,
-        .ready = 0,
-        .needs_adapter = 0,
-        .blocked = 0,
-    };
+    CatalogSummary catalog;
     mermaid.setCatalog(catalog);
 
     Serial.println("M3rMa1d S1r3n Core: MermaidLink v2 ready; STOP asserted");
