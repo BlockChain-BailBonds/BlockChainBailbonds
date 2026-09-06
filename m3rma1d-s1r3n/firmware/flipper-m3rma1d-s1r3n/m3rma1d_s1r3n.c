@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mermaid_link.h"
+
 #define TAG "M3RMA1D"
 
 typedef enum {
@@ -22,6 +24,7 @@ typedef struct {
     FuriMessageQueue* queue;
     ViewPort* viewport;
     Gui* gui;
+    MermaidLink* link;
     MermaidPage page;
     bool stop_asserted;
     bool codex_linked;
@@ -29,12 +32,58 @@ typedef struct {
     bool camera_ready;
     bool approval_pending;
     bool theme_animation;
+    bool catalog_valid;
+    uint16_t catalog_total;
+    uint16_t catalog_ready;
+    uint16_t catalog_needs_adapter;
+    uint16_t catalog_blocked;
     uint32_t packets_rx;
     uint32_t packets_tx;
     uint32_t faults;
     uint32_t heartbeat_ms;
+    uint32_t last_job_id;
+    int16_t last_job_code;
     char last_event[32];
 } MermaidApp;
+
+static void set_event(MermaidApp* app, const char* event) {
+    snprintf(app->last_event, sizeof(app->last_event), "%s", event);
+}
+
+static void status_callback(const MermaidRemoteStatus* status, void* context) {
+    MermaidApp* app = context;
+    app->codex_linked = status->codex_linked;
+    app->s3_linked = status->s3_linked;
+    app->camera_ready = status->camera_ready;
+    app->stop_asserted = status->stop_asserted;
+    app->approval_pending = status->approval_pending;
+    app->heartbeat_ms = status->heartbeat_ms;
+    app->packets_rx = status->packets_rx;
+    app->packets_tx = status->packets_tx;
+    app->faults = status->faults;
+    set_event(app, "status.updated");
+}
+
+static void catalog_callback(const MermaidCatalogSummary* catalog, void* context) {
+    MermaidApp* app = context;
+    app->catalog_total = catalog->total;
+    app->catalog_ready = catalog->ready;
+    app->catalog_needs_adapter = catalog->needs_adapter;
+    app->catalog_blocked = catalog->blocked;
+    app->catalog_valid = true;
+    set_event(app, "catalog.updated");
+}
+
+static void result_callback(uint32_t job_id, int16_t code, const char* text, void* context) {
+    MermaidApp* app = context;
+    app->last_job_id = job_id;
+    app->last_job_code = code;
+    if(text && text[0]) {
+        snprintf(app->last_event, sizeof(app->last_event), "job:%lu %.18s", (unsigned long)job_id, text);
+    } else {
+        snprintf(app->last_event, sizeof(app->last_event), "job:%lu code:%d", (unsigned long)job_id, code);
+    }
+}
 
 static const char* page_name(MermaidPage page) {
     switch(page) {
@@ -82,7 +131,7 @@ static void draw_home(Canvas* canvas, MermaidApp* app) {
 
 static void draw_codex(Canvas* canvas, MermaidApp* app) {
     canvas_draw_str(canvas, 3, 27, app->codex_linked ? "Session: LINKED" : "Session: ADRIFT");
-    canvas_draw_str(canvas, 3, 38, "ADL: v2 manifest mode");
+    canvas_draw_str(canvas, 3, 38, mermaid_link_is_open(app->link) ? "MermaidLink: UART OK" : "MermaidLink: CLOSED");
     canvas_draw_str(canvas, 3, 49, app->approval_pending ? "Approval: PENDING" : "Approval: clear");
     draw_footer(canvas, "OK refresh  < > pages");
 }
@@ -90,16 +139,25 @@ static void draw_codex(Canvas* canvas, MermaidApp* app) {
 static void draw_vision(Canvas* canvas, MermaidApp* app) {
     canvas_draw_str(canvas, 3, 27, app->camera_ready ? "OV3660: READY" : "OV3660: UNKNOWN");
     canvas_draw_str(canvas, 3, 38, app->s3_linked ? "Vision S3: LINKED" : "Vision S3: ADRIFT");
-    canvas_draw_str(canvas, 3, 49, "Events feed Codex/ADL");
-    draw_footer(canvas, "OK request snapshot");
+    canvas_draw_str(canvas, 3, 49, "Vision feeds Codex/ADL");
+    draw_footer(canvas, "OK refresh status");
 }
 
 static void draw_ops(Canvas* canvas, MermaidApp* app) {
-    UNUSED(app);
-    canvas_draw_str(canvas, 3, 27, "Catalog: manifest-driven");
-    canvas_draw_str(canvas, 3, 38, "Apps/functions via ADL");
-    canvas_draw_str(canvas, 3, 49, "Missing deps -> resolver");
-    draw_footer(canvas, "OK catalog  < > pages");
+    char line[32];
+    if(!app->catalog_valid) {
+        canvas_draw_str(canvas, 3, 27, "Catalog: not loaded");
+        canvas_draw_str(canvas, 3, 38, "Manifest-driven ADL v2");
+        canvas_draw_str(canvas, 3, 49, "OK requests live catalog");
+    } else {
+        snprintf(line, sizeof(line), "Apps %u  Ready %u", app->catalog_total, app->catalog_ready);
+        canvas_draw_str(canvas, 3, 27, line);
+        snprintf(line, sizeof(line), "Need adapter %u", app->catalog_needs_adapter);
+        canvas_draw_str(canvas, 3, 38, line);
+        snprintf(line, sizeof(line), "Blocked %u", app->catalog_blocked);
+        canvas_draw_str(canvas, 3, 49, line);
+    }
+    draw_footer(canvas, "OK refresh catalog");
 }
 
 static void draw_safety(Canvas* canvas, MermaidApp* app) {
@@ -107,8 +165,8 @@ static void draw_safety(Canvas* canvas, MermaidApp* app) {
     canvas_draw_str(canvas, 3, 27, app->stop_asserted ? "STOP ASSERTED" : "SIREN READY");
     snprintf(line, sizeof(line), "Codex:%s S3:%s", yesno(app->codex_linked), yesno(app->s3_linked));
     canvas_draw_str(canvas, 3, 38, line);
-    canvas_draw_str(canvas, 3, 49, "READY requires healthy gates");
-    draw_footer(canvas, "OK toggle safety state");
+    canvas_draw_str(canvas, 3, 49, "READY is remote-gated");
+    draw_footer(canvas, "OK request READY/STOP");
 }
 
 static void draw_telemetry(Canvas* canvas, MermaidApp* app) {
@@ -124,17 +182,17 @@ static void draw_telemetry(Canvas* canvas, MermaidApp* app) {
 
 static void draw_settings(Canvas* canvas, MermaidApp* app) {
     canvas_draw_str(canvas, 3, 27, app->theme_animation ? "Theme animation: ON" : "Theme animation: OFF");
-    canvas_draw_str(canvas, 3, 38, "Boot state: fail-closed");
-    canvas_draw_str(canvas, 3, 49, "Back: leave in STOP");
+    canvas_draw_str(canvas, 3, 38, "UART: 230400 8N1");
+    canvas_draw_str(canvas, 3, 49, "Exit always requests STOP");
     draw_footer(canvas, "OK toggle animation");
 }
 
 static void draw_about(Canvas* canvas, MermaidApp* app) {
     UNUSED(app);
     canvas_draw_str(canvas, 3, 27, "M3RMA1D_S1R3N");
-    canvas_draw_str(canvas, 3, 38, "ADL 2.0 / Codex ready");
+    canvas_draw_str(canvas, 3, 38, "ADL 2.0 + MermaidLink 2");
     canvas_draw_str(canvas, 3, 49, "918 Technologies");
-    draw_footer(canvas, "Built for Flipper Zero");
+    draw_footer(canvas, "Flipper Zero command deck");
 }
 
 static void draw(Canvas* canvas, void* ctx) {
@@ -164,8 +222,13 @@ static void input_cb(InputEvent* event, void* ctx) {
     furi_message_queue_put(queue, event, FuriWaitForever);
 }
 
-static void set_event(MermaidApp* app, const char* event) {
-    snprintf(app->last_event, sizeof(app->last_event), "%s", event);
+static void request_status(MermaidApp* app) {
+    if(mermaid_link_request_status(app->link)) {
+        set_event(app, "status.request");
+    } else {
+        app->faults++;
+        set_event(app, "link.closed");
+    }
 }
 
 static void activate_page_action(MermaidApp* app) {
@@ -173,33 +236,33 @@ static void activate_page_action(MermaidApp* app) {
     case PageHome:
     case PageSafety:
         if(app->stop_asserted) {
-            if(app->codex_linked && app->s3_linked) {
-                app->stop_asserted = false;
-                set_event(app, "ready.operator");
+            if(app->codex_linked && app->s3_linked && mermaid_link_request_ready(app->link)) {
+                set_event(app, "ready.requested");
             } else {
                 app->faults++;
                 set_event(app, "ready.denied");
             }
         } else {
             app->stop_asserted = true;
-            set_event(app, "stop.operator");
+            if(mermaid_link_send_stop(app->link, 0)) {
+                set_event(app, "stop.requested");
+            } else {
+                app->faults++;
+                set_event(app, "stop.link_failed");
+            }
         }
         break;
     case PageCodex:
-        set_event(app, "codex.refresh");
-        break;
     case PageVision:
-        if(app->camera_ready && app->s3_linked) {
-            app->packets_tx++;
-            set_event(app, "vision.snapshot");
-        } else {
-            app->faults++;
-            set_event(app, "vision.denied");
-        }
+        request_status(app);
         break;
     case PageOps:
-        set_event(app, "catalog.request");
-        app->packets_tx++;
+        if(mermaid_link_request_catalog(app->link)) {
+            set_event(app, "catalog.request");
+        } else {
+            app->faults++;
+            set_event(app, "catalog.failed");
+        }
         break;
     case PageSettings:
         app->theme_animation = !app->theme_animation;
@@ -219,8 +282,17 @@ int32_t m3rma1d_s1r3n_app(void* p) {
     app->page = PageHome;
     app->stop_asserted = true;
     app->theme_animation = true;
-    app->heartbeat_ms = 0;
     set_event(app, "boot.fail_closed");
+
+    app->link = mermaid_link_alloc();
+    furi_check(app->link);
+    mermaid_link_set_callbacks(app->link, status_callback, catalog_callback, result_callback, app);
+    if(mermaid_link_is_open(app->link)) {
+        mermaid_link_request_status(app->link);
+    } else {
+        app->faults++;
+        set_event(app, "uart.unavailable");
+    }
 
     app->queue = furi_message_queue_alloc(8, sizeof(InputEvent));
     app->viewport = view_port_alloc();
@@ -232,7 +304,8 @@ int32_t m3rma1d_s1r3n_app(void* p) {
     bool running = true;
     InputEvent event;
     while(running) {
-        if(furi_message_queue_get(app->queue, &event, 100) == FuriStatusOk && event.type == InputTypePress) {
+        mermaid_link_poll(app->link);
+        if(furi_message_queue_get(app->queue, &event, 50) == FuriStatusOk && event.type == InputTypePress) {
             if(event.key == InputKeyBack) {
                 if(app->page == PageHome) {
                     running = false;
@@ -251,12 +324,14 @@ int32_t m3rma1d_s1r3n_app(void* p) {
     }
 
     app->stop_asserted = true;
-    FURI_LOG_I(TAG, "Exit: STOP asserted");
+    mermaid_link_send_stop(app->link, 0);
+    FURI_LOG_I(TAG, "Exit: STOP requested");
     view_port_enabled_set(app->viewport, false);
     gui_remove_view_port(app->gui, app->viewport);
     view_port_free(app->viewport);
     furi_message_queue_free(app->queue);
     furi_record_close(RECORD_GUI);
+    mermaid_link_free(app->link);
     free(app);
     return 0;
 }
