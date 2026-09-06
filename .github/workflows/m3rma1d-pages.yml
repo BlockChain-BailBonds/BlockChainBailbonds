@@ -1,0 +1,50 @@
+name: M3rMa1d S1r3n Hardware Lab Pages
+
+on:
+  push:
+    branches:
+      - feat/m3rma1d-s1r3n-integrated-firmware
+      - main
+    paths:
+      - 'm3rma1d-s1r3n/web-installer/**'
+      - '.github/workflows/m3rma1d-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static hardware lab
+        run: |
+          test -s m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'M3rMa1d S1r3n Hardware Lab' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Export Signed-style HTML Proof' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Detect + Flash' m3rma1d-s1r3n/web-installer/index.html
+          grep -q 'Web Serial' m3rma1d-s1r3n/web-installer/index.html
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: m3rma1d-s1r3n/web-installer
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
