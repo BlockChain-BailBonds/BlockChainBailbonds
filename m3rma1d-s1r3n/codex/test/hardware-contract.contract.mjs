@@ -21,32 +21,33 @@ const transport = new HttpCoreTransport({
   allowInsecureLocalHttp: process.env.S1R3N_ALLOW_INSECURE_LOCAL_HTTP === 'true',
 });
 
-test('real Core attests the fixed topology and all required hardware nodes', async () => {
+const route = {logical_target:'flipper', physical_owner:'s3-cam', fallback_physical_route:false};
+
+test('real S3-CAM attests the fixed two-device topology', async () => {
   const status = await transport.status();
-  assert.equal(status.physical_owner, 'deck-cyd');
+  assert.equal(status.physical_owner, 's3-cam');
   assert.equal(status.fallback_physical_route, false);
-  assert.equal(status.deck_online, true);
   assert.equal(status.flipper_online, true);
-  assert.equal(status.safety_healthy, true);
-  assert.ok(Number.isInteger(status.safety_nodes_online));
-  assert.ok(status.safety_nodes_online >= 3, `expected 3 C5 nodes, received ${status.safety_nodes_online}`);
+  assert.equal(typeof status.stop_asserted, 'boolean');
+  assert.equal(status.shell_enabled, false);
+  assert.equal(status.raw_cli_enabled, false);
 });
 
-test('real Core returns a Flipper inventory from the CYD bridge', async () => {
+test('real S3-CAM returns the live Flipper application inventory', async () => {
   const inventory = await transport.inventory();
   assert.equal(inventory.flipper.online, true);
-  assert.equal(inventory.flipper.physical_owner, 'deck-cyd');
+  assert.equal(inventory.flipper.physical_owner, 's3-cam');
   assert.ok(Array.isArray(inventory.flipper.apps));
   assert.ok(inventory.flipper.apps.length > 0, 'Flipper app inventory is empty');
 });
 
-test('optional real read-only device-info operation executes through the CYD', async (context) => {
+test('optional real read-only device-info operation executes through S3-CAM', async (context) => {
   if (process.env.S1R3N_HARDWARE_TEST_EXECUTE_READONLY !== 'true') {
     context.skip('set S1R3N_HARDWARE_TEST_EXECUTE_READONLY=true after STOP is intentionally cleared');
     return;
   }
   const status = await transport.status();
-  assert.equal(status.stop_asserted, false, 'Core/Deck STOP must be intentionally cleared before execution');
+  assert.equal(status.stop_asserted, false, 'S3-CAM/Flipper STOP must be intentionally cleared before execution');
 
   const stateDir = await mkdtemp(path.join(os.tmpdir(), 's1r3n-hardware-contract-'));
   const catalog = new CatalogService({packageRoot, stateDir});
@@ -54,7 +55,6 @@ test('optional real read-only device-info operation executes through the CYD', a
   const adapter = await catalog.getAdapter('stock.system.device_info');
   assert.equal(adapter.verification_status, 'bundled_verified');
 
-  const route = {logical_target:'flipper', physical_owner:'deck-cyd', fallback_physical_route:false};
   const program = {
     version: 1,
     program_id: `hardware-contract-${Date.now()}`,
@@ -83,4 +83,35 @@ test('optional real read-only device-info operation executes through the CYD', a
   assert.equal(result.job_id, job.job_id);
   assert.equal(result.code, 0, result.text);
   assert.ok(result.data && typeof result.data === 'object', 'device information payload missing');
+});
+
+test('optional closed-loop proof reports before/after state and evidence hash', async (context) => {
+  if (process.env.S1R3N_HARDWARE_TEST_CLOSED_LOOP !== 'true') {
+    context.skip('set S1R3N_HARDWARE_TEST_CLOSED_LOOP=true for the real adapter-proof run');
+    return;
+  }
+  const status = await transport.status();
+  assert.equal(status.stop_asserted, false, 'STOP must be cleared before closed-loop validation');
+
+  const program = {
+    version: 1,
+    program_id: `closed-loop-${Date.now()}`,
+    adapter: {id:'contract.loader.open', sha256:'0'.repeat(64), origin:'contract', verification_status:'device_testing'},
+    route,
+    risk: 'local_state',
+    approval: 'auto',
+    timeout_ms: 10000,
+    operations: [{op:'app_start', app_name:'M3rMa1d S1r3n', args:''}, {op:'wait_ms', ms:250}, {op:'app_exit'}],
+    artifacts: [],
+    validation: {mode:'closed_loop_adapter_test', app_id:'m3rma1d_s1r3n', function:'open', require_observed_success:true},
+  };
+  program.sha256 = sha256(stableJson(program));
+  const job = {job_id:program.program_id, target:'flipper-link', route, risk:'local_state', approval:'auto', flipper_program:program};
+  const result = await transport.execute(job, Date.now() + 15000);
+  assert.equal(result.job_id, job.job_id);
+  assert.equal(result.code, 0, result.text);
+  assert.equal(result.observed_success, true);
+  assert.match(result.evidence_sha256 ?? '', /^[a-f0-9]{64}$/);
+  assert.ok(result.before_state && typeof result.before_state === 'object');
+  assert.ok(result.after_state && typeof result.after_state === 'object');
 });
