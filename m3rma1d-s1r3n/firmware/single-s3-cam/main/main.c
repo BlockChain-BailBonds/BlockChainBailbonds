@@ -25,7 +25,11 @@ static esp_err_t health_get(httpd_req_t* req){
 }
 
 static esp_err_t snapshot_get(httpd_req_t* req){
-    if(!camera_ok){httpd_resp_send_err(req,HTTPD_503_SERVICE_UNAVAILABLE,"camera unavailable");return ESP_FAIL;}
+    if(!camera_ok){
+        httpd_resp_set_status(req,"503 Service Unavailable");
+        httpd_resp_sendstr(req,"camera unavailable");
+        return ESP_FAIL;
+    }
     camera_fb_t* fb=esp_camera_fb_get();
     if(!fb){httpd_resp_send_err(req,HTTPD_500_INTERNAL_SERVER_ERROR,"capture failed");return ESP_FAIL;}
     httpd_resp_set_type(req,"image/jpeg");
@@ -34,10 +38,19 @@ static esp_err_t snapshot_get(httpd_req_t* req){
     return err;
 }
 
-static esp_err_t stop_post(httpd_req_t* req){s1r3n_runtime_set_stop(true,"remote stop");if(expansion.rpc_active){s1r3n_exp_stop_rpc(&expansion);}httpd_resp_sendstr(req,"STOPPED\n");return ESP_OK;}
+static esp_err_t stop_post(httpd_req_t* req){
+    s1r3n_runtime_set_stop(true,"remote stop");
+    if(expansion.rpc_active){s1r3n_exp_stop_rpc(&expansion);}
+    httpd_resp_sendstr(req,"STOPPED\n");
+    return ESP_OK;
+}
 
 static esp_err_t ready_post(httpd_req_t* req){
-    if(!camera_ok||!flipper_ok){httpd_resp_send_err(req,HTTPD_409_CONFLICT,"camera/flipper not ready");return ESP_FAIL;}
+    if(!camera_ok||!flipper_ok){
+        httpd_resp_set_status(req,"409 Conflict");
+        httpd_resp_sendstr(req,"camera/flipper not ready");
+        return ESP_FAIL;
+    }
     s1r3n_runtime_set_stop(false,"user-test ready");
     httpd_resp_sendstr(req,"READY\n");
     return ESP_OK;
