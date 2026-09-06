@@ -1,26 +1,34 @@
 {
-  "routing_version": "1.0",
+  "routing_version": "2.0",
   "logical_target": "flipper",
-  "physical_owner": "deck-cyd",
+  "physical_owner": "s3-cam",
+  "topology": ["s3-cam", "flipper-zero"],
   "bridge": {
     "interface": "uart",
-    "uart_port": 2,
     "baud": 230400,
     "format": "8N1",
-    "deck_rx_gpio": 22,
-    "deck_tx_gpio": 27,
+    "s3_rx_gpio": 1,
+    "s3_tx_gpio": 2,
     "flipper_tx_pin": 13,
     "flipper_rx_pin": 14,
-    "ground_pin": 18,
+    "common_ground_required": true,
     "power_connection": false
   },
-  "forbidden_direct_nodes": [
-    "core-s3",
-    "vision-s3cam",
-    "c5-supermini-1",
-    "c5-supermini-2",
-    "c5-supermini-3"
-  ],
+  "codex": {
+    "mode": "autonomous_registered_capabilities",
+    "shell": false,
+    "raw_cli": false,
+    "requires_verified_adapter": true,
+    "requires_active_lease": true,
+    "stop_preempts_all": true,
+    "approval_policy": {
+      "observe": "automatic",
+      "local_state": "automatic",
+      "physical_output": "policy",
+      "transmit": "policy_and_declared_asset",
+      "restricted": "deny"
+    }
+  },
   "failure_mode": "fail_closed",
   "fallback_physical_route": false
 }
