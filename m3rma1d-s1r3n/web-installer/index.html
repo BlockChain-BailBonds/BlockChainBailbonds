@@ -3,70 +3,167 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>M3rMa1d S1r3n Web Installer</title>
+<meta name="color-scheme" content="dark">
+<title>M3rMa1d S1r3n Hardware Lab</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 20px;background:#0b1020;color:#eef2ff}button,select{font:inherit;padding:12px 16px;margin:6px 0;border-radius:10px;border:0}button{cursor:pointer;background:#6366f1;color:white}pre{background:#111827;padding:16px;border-radius:12px;min-height:240px;white-space:pre-wrap}section{background:#151c30;padding:20px;border-radius:16px;margin:16px 0}.warn{color:#fbbf24}
+:root{--bg:#07101b;--panel:#0f1d2d;--line:#25415d;--text:#eaf6ff;--muted:#9db3c7;--accent:#38bdf8;--good:#34d399;--warn:#fbbf24;--bad:#fb7185}
+*{box-sizing:border-box}body{font-family:Inter,ui-sans-serif,system-ui,sans-serif;margin:0;background:linear-gradient(180deg,#06101a,#0b1522 40%,#07101b);color:var(--text)}main{max-width:1180px;margin:auto;padding:24px}.hero{display:flex;gap:18px;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.hero h1{margin:0;font-size:clamp(28px,5vw,48px)}.hero p{color:var(--muted);max-width:760px}.badge{border:1px solid var(--line);border-radius:999px;padding:7px 10px;font-size:12px;white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}.card{background:rgba(15,29,45,.94);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.18)}h2{font-size:18px;margin:0 0 12px}h3{font-size:14px;margin:14px 0 8px;color:#cfe9fb}label{display:block;color:var(--muted);font-size:13px;margin:10px 0 5px}select,input,textarea,button{font:inherit}select,input[type=text],input[type=number],textarea{width:100%;background:#08131f;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px}textarea{min-height:90px;resize:vertical}button{border:1px solid #2f6f95;background:#0c5f8f;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;margin:4px 4px 4px 0}button.secondary{background:#12263a;border-color:var(--line)}button.good{background:#087a56;border-color:#10b981}button.danger{background:#8b1e3f;border-color:#be345f}button:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.status{padding:8px 10px;border-radius:10px;background:#091625;border:1px solid var(--line);font-size:13px;margin-top:8px}.goodText{color:var(--good)}.warnText{color:var(--warn)}.badText{color:var(--bad)}.muted{color:var(--muted)}pre{background:#050b12;border:1px solid var(--line);padding:12px;border-radius:12px;min-height:170px;max-height:380px;overflow:auto;white-space:pre-wrap;word-break:break-word}.test{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(37,65,93,.5)}.test:last-child{border-bottom:0}.test select{width:135px;padding:7px}.firmware-row{display:grid;grid-template-columns:110px 1fr 92px;gap:8px;align-items:center;margin:7px 0}.firmware-row input[type=file]{width:100%}.small{font-size:12px}.proof-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:#08131f;border:1px solid var(--line);border-radius:12px;padding:10px}.metric b{display:block;font-size:20px}.sticky-stop{position:fixed;right:18px;bottom:18px;z-index:10;box-shadow:0 12px 30px rgba(0,0,0,.4)}details{margin-top:10px}summary{cursor:pointer}.footer{color:var(--muted);font-size:12px;padding:18px 2px}@media(max-width:700px){.hero{display:block}.badge{display:inline-block;margin-top:8px}.proof-summary{grid-template-columns:repeat(2,1fr)}.firmware-row{grid-template-columns:1fr}.test{grid-template-columns:1fr}}
 </style>
+<script type="module">
+import { ESPLoader, Transport } from 'https://cdn.jsdelivr.net/npm/esptool-js@0.5.7/bundle.js';
+
+const roles = {
+  'core-s3': {label:'Core ESP32-S3 N16R8',chip:'ESP32-S3',baud:115200,flashBaud:921600,expected:['M3rMa1d S1r3n Core','STOP asserted']},
+  'vision-s3-ov3660': {label:'Vision ESP32-S3 N16R8 + OV3660',chip:'ESP32-S3',baud:115200,flashBaud:921600,expected:['Vision']},
+  'c5-guardian': {label:'ESP32-C5 Guardian',chip:'ESP32-C5',baud:115200,flashBaud:460800,expected:['Guardian']},
+  'c5-watcher': {label:'ESP32-C5 Watcher',chip:'ESP32-C5',baud:115200,flashBaud:460800,expected:['Watcher']},
+  'c5-arbiter': {label:'ESP32-C5 Arbiter',chip:'ESP32-C5',baud:115200,flashBaud:460800,expected:['Arbiter']},
+  'deck-cyd': {label:'ESP32-32E N4 CYD Deck',chip:'ESP32',baud:115200,flashBaud:460800,expected:['Deck']},
+};
+
+const hardwareTests = [
+  ['identity','Device identity / expected role'],
+  ['boot','Boot banner and fail-closed startup'],
+  ['wiring','Continuity / documented wiring'],
+  ['logic','3.3 V logic levels'],
+  ['power','Independent power / no backfeed'],
+  ['heartbeat','Heartbeat / liveness'],
+  ['stop','STOP asserted and persistent'],
+  ['brownout','Brownout / reboot returns STOP'],
+  ['cable','Cable removal fails closed'],
+  ['uart','UART / MermaidLink framing'],
+  ['flipper','Flipper compatibility'],
+  ['approval','Approval deny / timeout behavior'],
+  ['readonly','Read-only device info operation'],
+  ['audit','Audit / evidence export'],
+];
+
+const $ = id => document.getElementById(id);
+const state = {port:null,reader:null,writer:null,readTask:null,log:[],flash:[],attachments:[],tests:{},sessionId:crypto.randomUUID(),started:new Date().toISOString(),deviceInfo:null};
+
+function append(msg,kind='info'){
+  const line=`[${new Date().toISOString()}] ${msg}`;
+  state.log.push({time:new Date().toISOString(),kind,message:String(msg)});
+  $('log').textContent += ($('log').textContent?'\n':'') + line;
+  $('log').scrollTop=$('log').scrollHeight;
+}
+function role(){return roles[$('role').value]}
+function bytesToHex(buf){return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function sha256Bytes(buf){return bytesToHex(await crypto.subtle.digest('SHA-256',buf))}
+async function sha256File(file){return sha256Bytes(await file.arrayBuffer())}
+function serialSupported(){return 'serial' in navigator}
+function setConn(text,cls='warnText'){$('connStatus').innerHTML=`<span class="${cls}">${text}</span>`}
+
+async function connectConsole(){
+  if(!serialSupported()) throw new Error('Web Serial unavailable. Use desktop Chrome/Edge over HTTPS.');
+  if(state.port) return;
+  state.port=await navigator.serial.requestPort();
+  state.deviceInfo=state.port.getInfo ? state.port.getInfo() : {};
+  await state.port.open({baudRate:role().baud});
+  state.writer=state.port.writable.getWriter();
+  setConn(`Connected at ${role().baud} baud`,'goodText');
+  append(`Serial connected role=${$('role').value} usb=${JSON.stringify(state.deviceInfo||{})}`);
+  const decoder=new TextDecoderStream();
+  state.port.readable.pipeTo(decoder.writable).catch(e=>append(`Serial pipe ended: ${e.message}`,'warn'));
+  state.reader=decoder.readable.getReader();
+  state.readTask=(async()=>{try{while(true){const {value,done}=await state.reader.read();if(done)break;if(value){$('rawText').value+=value;append(`RX ${value.trimEnd()}`)}}}catch(e){append(`Read error: ${e.message}`,'error')}})();
+}
+async function disconnectConsole(){
+  try{if(state.reader){await state.reader.cancel();state.reader.releaseLock();state.reader=null}}catch{}
+  try{if(state.writer){state.writer.releaseLock();state.writer=null}}catch{}
+  try{if(state.port){await state.port.close();state.port=null}}catch{}
+  setConn('Disconnected');append('Serial disconnected');
+}
+async function sendLine(line){if(!state.writer)throw new Error('Serial console not connected');await state.writer.write(new TextEncoder().encode(line+'\r\n'));append(`TX ${line}`)}
+
+function makeTests(){
+  const host=$('tests'); host.innerHTML='';
+  for(const [id,label] of hardwareTests){
+    const d=document.createElement('div');d.className='test';d.innerHTML=`<span>${label}</span><select id="test-${id}"><option>NOT TESTED</option><option>PASS</option><option>FAIL</option><option>BLOCKED</option></select>`;
+    host.appendChild(d);$('test-'+id).addEventListener('change',e=>{state.tests[id]=e.target.value;updateProofSummary()});state.tests[id]='NOT TESTED';
+  }
+}
+function updateProofSummary(){
+  const vals=Object.values(state.tests);for(const s of ['PASS','FAIL','NOT TESTED','BLOCKED']) $('m'+s.replace(' ','')).textContent=vals.filter(v=>v===s).length;
+}
+
+async function inspectFirmware(){
+  const map=[['boot','0x0'],['part','0x8000'],['app','0x10000']];
+  state.flash=[];
+  for(const [id,def] of map){const f=$('fw-'+id).files[0];if(!f)continue;const offset=parseInt($('off-'+id).value||def,16);const hash=await sha256File(f);state.flash.push({slot:id,name:f.name,size:f.size,offset,sha256:hash,file:f});append(`Firmware ${id}: ${f.name} ${f.size} bytes sha256=${hash} offset=0x${offset.toString(16)}`)}
+  $('firmwareStatus').textContent=state.flash.length?`${state.flash.length} image(s) hashed and ready.`:'No firmware images selected.';
+}
+
+async function flashFirmware(){
+  if(!serialSupported())throw new Error('Web Serial unavailable');
+  await inspectFirmware();if(!state.flash.length)throw new Error('Select at least one firmware image');
+  if(state.port)await disconnectConsole();
+  if(!confirm(`Flash ${state.flash.length} verified local image(s) to selected ${role().label}? Existing flash contents can be overwritten.`))return;
+  const port=await navigator.serial.requestPort();
+  const transport=new Transport(port,true);
+  const terminal={clean(){},writeLine(data){append(`FLASH ${String(data)}`)},write(data){append(`FLASH ${String(data)}`)}};
+  const loader=new ESPLoader({transport,baudrate:role().flashBaud,terminal});
+  try{
+    const chip=await loader.main();append(`Detected chip: ${chip}`);
+    if(role().chip && !String(chip).toUpperCase().includes(role().chip.toUpperCase().replace('-','')) && !String(chip).toUpperCase().includes(role().chip.toUpperCase())){
+      if(!confirm(`Detected ${chip}, expected ${role().chip}. Continue anyway?`))throw new Error('Chip mismatch rejected by operator');
+    }
+    const fileArray=[];
+    for(const x of state.flash){const raw=new Uint8Array(await x.file.arrayBuffer());let binary='';for(let i=0;i<raw.length;i+=0x8000)binary+=String.fromCharCode(...raw.subarray(i,Math.min(i+0x8000,raw.length)));fileArray.push({data:binary,address:x.offset})}
+    await loader.writeFlash({fileArray,flashSize:'keep',flashMode:'keep',flashFreq:'keep',eraseAll:false,compress:true,reportProgress:(fileIndex,written,total)=>{$('flashProgress').value=total?Math.round(written*100/total):0}});
+    append('FLASH COMPLETE');$('flashResult').innerHTML='<span class="goodText">FLASH COMPLETE</span>';state.tests.identity='NOT TESTED';
+    await transport.disconnect();
+  }catch(e){append(`FLASH FAILED: ${e.message}`,'error');$('flashResult').innerHTML=`<span class="badText">FLASH FAILED: ${e.message}</span>`;try{await transport.disconnect()}catch{};throw e}
+}
+
+async function autoTestBoot(){
+  const text=$('rawText').value;const expect=role().expected;const pass=expect.length&&expect.every(x=>text.includes(x));$('test-boot').value=pass?'PASS':'FAIL';state.tests.boot=pass?'PASS':'FAIL';append(`Auto boot test ${pass?'PASS':'FAIL'} expected=${JSON.stringify(expect)}`);updateProofSummary();
+}
+async function addAttachments(){
+  const files=[...$('attachments').files];for(const f of files){state.attachments.push({name:f.name,size:f.size,type:f.type,sha256:await sha256File(f)});append(`Evidence attachment hashed: ${f.name}`)}$('attachmentCount').textContent=`${state.attachments.length} hashed attachment(s)`;
+}
+function proofObject(){
+  return {schema:'m3rma1d.hardware-proof.v1',session_id:state.sessionId,started_at:state.started,generated_at:new Date().toISOString(),role:$('role').value,role_label:role().label,operator:$('operator').value.trim(),device_serial:$('deviceSerial').value.trim(),commit:$('commit').value.trim(),browser:navigator.userAgent,secure_context:isSecureContext,web_serial:serialSupported(),usb_info:state.deviceInfo,firmware:state.flash.map(({file,...x})=>x),tests:{...state.tests},notes:$('notes').value,attachments:state.attachments,serial_transcript:state.log};
+}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+function exportJson(){const proof=proofObject();dl(new Blob([JSON.stringify(proof,null,2)],{type:'application/json'}),`m3rma1d-proof-${state.sessionId}.json`)}
+async function exportHtml(){
+  const proof=proofObject();const digest=await sha256Bytes(new TextEncoder().encode(JSON.stringify(proof)).buffer);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const rows=Object.entries(proof.tests).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  const fw=proof.firmware.map(x=>`<tr><td>${esc(x.slot)}</td><td>${esc(x.name)}</td><td>0x${x.offset.toString(16)}</td><td><code>${esc(x.sha256)}</code></td></tr>`).join('')||'<tr><td colspan="4">None recorded</td></tr>';
+  const html=`<!doctype html><meta charset="utf-8"><title>M3rMa1d Hardware Proof ${esc(proof.session_id)}</title><style>body{font-family:system-ui;max-width:980px;margin:30px auto;padding:20px;background:#08111c;color:#eaf6ff}table{border-collapse:collapse;width:100%}td,th{border:1px solid #345;padding:8px;text-align:left}code,pre{word-break:break-all;white-space:pre-wrap}.pass{color:#34d399}.fail{color:#fb7185}</style><h1>M3rMa1d S1r3n Hardware Proof</h1><p><b>Session:</b> ${esc(proof.session_id)}<br><b>Generated:</b> ${esc(proof.generated_at)}<br><b>Role:</b> ${esc(proof.role_label)}<br><b>Operator:</b> ${esc(proof.operator)}<br><b>Device serial:</b> ${esc(proof.device_serial)}<br><b>Commit:</b> ${esc(proof.commit)}</p><h2>Proof digest</h2><code>sha256:${digest}</code><h2>Firmware</h2><table><tr><th>Slot</th><th>File</th><th>Offset</th><th>SHA-256</th></tr>${fw}</table><h2>Hardware tests</h2><table><tr><th>Gate</th><th>Status</th></tr>${rows}</table><h2>Evidence attachment hashes</h2><pre>${esc(JSON.stringify(proof.attachments,null,2))}</pre><h2>Notes</h2><pre>${esc(proof.notes)}</pre><h2>Serial / action transcript</h2><pre>${esc(proof.serial_transcript.map(x=>`[${x.time}] ${x.kind}: ${x.message}`).join('\n'))}</pre><h2>Embedded machine-readable proof</h2><script type="application/json" id="m3rma1d-proof">${JSON.stringify(proof).replace(/</g,'\\u003c')}<\/script>`;
+  dl(new Blob([html],{type:'text/html'}),`m3rma1d-proof-${state.sessionId}.html`);append(`Proof HTML generated digest=${digest}`);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  makeTests();updateProofSummary();$('session').textContent=state.sessionId;$('support').innerHTML=`Secure context: <b>${isSecureContext?'YES':'NO'}</b> · Web Serial: <b>${serialSupported()?'YES':'NO'}</b>`;
+  $('connect').onclick=()=>connectConsole().catch(e=>append(`CONNECT ERROR: ${e.message}`,'error'));
+  $('disconnect').onclick=()=>disconnectConsole();$('sendStatus').onclick=()=>sendLine('status').catch(e=>append(e.message,'error'));$('sendInfo').onclick=()=>sendLine('device_info').catch(e=>append(e.message,'error'));$('sendStop').onclick=()=>sendLine('stop').catch(e=>append(e.message,'error'));
+  $('inspect').onclick=()=>inspectFirmware().catch(e=>append(`Firmware inspect error: ${e.message}`,'error'));$('flash').onclick=()=>flashFirmware().catch(()=>{});$('autoBoot').onclick=autoTestBoot;$('hashEvidence').onclick=()=>addAttachments().catch(e=>append(e.message,'error'));$('exportJson').onclick=exportJson;$('exportHtml').onclick=()=>exportHtml().catch(e=>append(e.message,'error'));$('clear').onclick=()=>{$('rawText').value='';$('log').textContent='';state.log=[]};
+  $('globalStop').onclick=()=>sendLine('stop').catch(e=>append(`STOP request could not be sent: ${e.message}`,'error'));
+});
+</script>
 </head>
 <body>
-<h1>M3rMa1d S1r3n Web Installer</h1>
-<p>Browser-based installer and serial console for the M3rMa1d S1r3n device stack, modeled after the simple Web Serial flow used by CLI-Esp32Marauder.</p>
-<section>
-<h2>1. Select device role</h2>
-<select id="role">
-<option value="core-s3">Core ESP32-S3 N16R8</option>
-<option value="vision-s3-ov3660">Vision ESP32-S3 N16R8 + OV3660</option>
-<option value="c5-guardian">ESP32-C5 Guardian</option>
-<option value="c5-watcher">ESP32-C5 Watcher</option>
-<option value="c5-arbiter">ESP32-C5 Arbiter</option>
-<option value="deck-cyd">ESP32-32E N4 CYD Deck</option>
-</select>
-<p class="warn">Flashing is intentionally unavailable until a verified release manifest with signed production firmware binaries exists. The installer will not substitute placeholder firmware.</p>
-<button id="connect">Connect to device</button>
-<button id="disconnect">Disconnect</button>
-</section>
-<section>
-<h2>2. Serial console</h2>
-<button id="status">Send status</button>
-<button id="info">Send device_info</button>
-<pre id="log">Waiting for connection...</pre>
-</section>
-<script>
-let port, reader, writer;
-const log = document.getElementById('log');
-function append(s){log.textContent += `\n${s}`;log.scrollTop=log.scrollHeight}
-async function connect(){
-  if(!('serial' in navigator)){append('Web Serial is not supported in this browser. Use Chrome/Edge on desktop.');return}
-  port = await navigator.serial.requestPort();
-  await port.open({baudRate:115200});
-  writer = port.writable.getWriter();
-  append('Connected.');
-  readLoop();
-}
-async function readLoop(){
-  const decoder = new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable).catch(()=>{});
-  reader = decoder.readable.getReader();
-  try{
-    while(true){const {value,done}=await reader.read();if(done)break;if(value)append(value)}
-  }catch(e){append(`Read error: ${e.message}`)}
-}
-async function send(line){
-  if(!writer){append('Not connected.');return}
-  const data = new TextEncoder().encode(line+'\r\n');
-  await writer.write(data);
-  append(`> ${line}`);
-}
-async function disconnect(){
-  try{if(reader){await reader.cancel();reader.releaseLock();reader=null}}catch{}
-  try{if(writer){writer.releaseLock();writer=null}}catch{}
-  try{if(port){await port.close();port=null}}catch{}
-  append('Disconnected.');
-}
-document.getElementById('connect').onclick=()=>connect().catch(e=>append(`Connect error: ${e.message}`));
-document.getElementById('disconnect').onclick=()=>disconnect();
-document.getElementById('status').onclick=()=>send('status');
-document.getElementById('info').onclick=()=>send('device_info');
-</script>
+<main>
+  <div class="hero"><div><h1>⚡ M3rMa1d S1r3n Hardware Lab</h1><p>GitHub Pages tester, local firmware flasher, and proof maker. It records what was actually observed; it never turns an untested gate into PASS automatically unless the browser directly verifies that check.</p></div><span class="badge">918 Technologies · fail-closed</span></div>
+  <div id="support" class="status"></div>
+
+  <div class="grid">
+    <section class="card"><h2>1 · Test Session</h2><label>Device role</label><select id="role"><option value="core-s3">Core ESP32-S3 N16R8</option><option value="vision-s3-ov3660">Vision ESP32-S3 N16R8 + OV3660</option><option value="c5-guardian">ESP32-C5 Guardian</option><option value="c5-watcher">ESP32-C5 Watcher</option><option value="c5-arbiter">ESP32-C5 Arbiter</option><option value="deck-cyd">ESP32-32E N4 CYD Deck</option></select><label>Operator</label><input id="operator" type="text" placeholder="Tester name / initials"><label>Physical device serial / label</label><input id="deviceSerial" type="text" placeholder="e.g. CORE-001"><label>Exact Git commit tested</label><input id="commit" type="text" placeholder="40-char commit SHA"><div class="status">Session <code id="session"></code></div></section>
+
+    <section class="card"><h2>2 · Connect & Console</h2><div class="row"><button id="connect">Connect Serial</button><button class="secondary" id="disconnect">Disconnect</button><button class="danger" id="sendStop">Send STOP</button></div><div id="connStatus" class="status"><span class="warnText">Disconnected</span></div><div class="row"><button class="secondary" id="sendStatus">status</button><button class="secondary" id="sendInfo">device_info</button><button class="secondary" id="autoBoot">Auto-check boot banner</button></div><label>Raw received text</label><textarea id="rawText" placeholder="Device output accumulates here"></textarea></section>
+
+    <section class="card"><h2>3 · Firmware Flasher</h2><p class="muted small">Uses local binaries selected by the operator. The page hashes every file before flashing. Default ESP32 offsets are shown; change them only when your build manifest requires different offsets.</p><div class="firmware-row"><b>Bootloader</b><input id="fw-boot" type="file" accept=".bin"><input id="off-boot" value="0x0"></div><div class="firmware-row"><b>Partitions</b><input id="fw-part" type="file" accept=".bin"><input id="off-part" value="0x8000"></div><div class="firmware-row"><b>Application</b><input id="fw-app" type="file" accept=".bin"><input id="off-app" value="0x10000"></div><div class="row"><button class="secondary" id="inspect">Hash Images</button><button class="good" id="flash">Detect + Flash</button></div><progress id="flashProgress" value="0" max="100" style="width:100%"></progress><div id="firmwareStatus" class="status">No firmware images selected.</div><div id="flashResult" class="status">No flash attempted.</div></section>
+
+    <section class="card"><h2>4 · Hardware Acceptance</h2><p class="muted small">Set PASS only when you have direct evidence. Electrical tests such as voltage, continuity, and backfeed still require a meter/scope or equivalent physical measurement.</p><div id="tests"></div></section>
+
+    <section class="card"><h2>5 · Evidence / Proof Maker</h2><label>Photos, scope screenshots, logic traces, exported logs</label><input id="attachments" type="file" multiple><div class="row"><button class="secondary" id="hashEvidence">Hash Evidence Files</button></div><div id="attachmentCount" class="status">0 hashed attachment(s)</div><label>Test notes</label><textarea id="notes" placeholder="Record wiring, meter readings, firmware version, cable-removal behavior, observed faults, etc."></textarea><h3>Gate counts</h3><div class="proof-summary"><div class="metric"><b id="mPASS">0</b><span>PASS</span></div><div class="metric"><b id="mFAIL">0</b><span>FAIL</span></div><div class="metric"><b id="mNOTTESTED">0</b><span>NOT TESTED</span></div><div class="metric"><b id="mBLOCKED">0</b><span>BLOCKED</span></div></div><div class="row" style="margin-top:12px"><button id="exportJson">Export JSON Proof</button><button class="good" id="exportHtml">Export Signed-style HTML Proof</button></div></section>
+
+    <section class="card"><h2>6 · Lab Transcript</h2><div class="row"><button class="secondary" id="clear">Clear display/log</button></div><pre id="log"></pre><details><summary>What this proves</summary><p class="muted small">The exported proof binds the session metadata, firmware SHA-256 hashes, test statuses, evidence-file hashes, browser/device metadata, and transcript into a portable report. It does not cryptographically attest external meter/scope readings by itself; those are operator evidence and should be attached and hashed.</p></details></section>
+  </div>
+  <p class="footer">Chrome/Edge desktop + HTTPS is required for Web Serial. Flashing is intentionally local and operator-initiated. Unknown devices, mismatched chip detection, or failed tests must remain FAIL/BLOCKED/NOT TESTED.</p>
+</main>
+<button id="globalStop" class="danger sticky-stop">⛔ STOP</button>
 </body>
 </html>
