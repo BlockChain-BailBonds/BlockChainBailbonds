@@ -3,7 +3,7 @@ import {constantTimeEqual, invariant, nowIso, stableJson, withTimeout} from './u
 
 const ROUTE = Object.freeze({
   logical_target: 'flipper',
-  physical_owner: 'deck-cyd',
+  physical_owner: 's3-cam',
   fallback_physical_route: false,
 });
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -42,22 +42,22 @@ function isPrivateHost(hostname) {
 }
 
 function validateRoute(route) {
-  invariant(route?.logical_target === ROUTE.logical_target, 'Core response logical route mismatch');
-  invariant(route?.physical_owner === ROUTE.physical_owner, 'Core response physical owner mismatch');
-  invariant(route?.fallback_physical_route === false, 'Core response attempted a fallback route');
+  invariant(route?.logical_target === ROUTE.logical_target, 'S3-CAM response logical route mismatch');
+  invariant(route?.physical_owner === ROUTE.physical_owner, 'S3-CAM response physical owner mismatch');
+  invariant(route?.fallback_physical_route === false, 'S3-CAM response attempted a fallback route');
 }
 
 export function verifyResponseEnvelope(envelope, requestEnvelope, key, clockSkewMs = 30000) {
-  invariant(envelope && typeof envelope === 'object' && !Array.isArray(envelope), 'Core returned an invalid response envelope');
-  invariant(envelope.version === 1, 'Core response version mismatch');
-  invariant(typeof envelope.type === 'string' && envelope.type === `${requestEnvelope.type}.result`, 'Core response type mismatch');
-  invariant(envelope.request_nonce === requestEnvelope.nonce, 'Core response nonce mismatch');
+  invariant(envelope && typeof envelope === 'object' && !Array.isArray(envelope), 'S3-CAM returned an invalid response envelope');
+  invariant(envelope.version === 1, 'S3-CAM response version mismatch');
+  invariant(typeof envelope.type === 'string' && envelope.type === `${requestEnvelope.type}.result`, 'S3-CAM response type mismatch');
+  invariant(envelope.request_nonce === requestEnvelope.nonce, 'S3-CAM response nonce mismatch');
   validateRoute(envelope.route);
   const timestamp = Date.parse(envelope.timestamp);
-  invariant(Number.isFinite(timestamp) && Math.abs(Date.now() - timestamp) <= clockSkewMs, 'Core response is stale');
-  invariant(SHA256.test(envelope.signature ?? ''), 'Core response signature is malformed');
-  invariant(constantTimeEqual(envelope.signature, signEnvelope(envelope, key)), 'Core response signature is invalid');
-  invariant(envelope.payload && typeof envelope.payload === 'object' && !Array.isArray(envelope.payload), 'Core response payload is invalid');
+  invariant(Number.isFinite(timestamp) && Math.abs(Date.now() - timestamp) <= clockSkewMs, 'S3-CAM response is stale');
+  invariant(SHA256.test(envelope.signature ?? ''), 'S3-CAM response signature is malformed');
+  invariant(constantTimeEqual(envelope.signature, signEnvelope(envelope, key)), 'S3-CAM response signature is invalid');
+  invariant(envelope.payload && typeof envelope.payload === 'object' && !Array.isArray(envelope.payload), 'S3-CAM response payload is invalid');
   return envelope.payload;
 }
 
@@ -75,7 +75,7 @@ export class HttpCoreTransport {
     invariant(typeof controlKey === 'string' && controlKey.length >= 32, 'S1R3N_CONTROL_KEY must contain at least 32 characters');
     const parsed = new URL(coreUrl);
     invariant(parsed.protocol === 'https:' || (parsed.protocol === 'http:' && allowInsecureLocalHttp && isPrivateHost(parsed.hostname)),
-      'Core URL must use HTTPS, or explicit insecure-local HTTP on a private address');
+      'S3-CAM URL must use HTTPS, or explicit insecure-local HTTP on a private address');
     this.coreUrl = parsed.toString().replace(/\/$/, '');
     this.controlKey = controlKey;
     this.timeoutMs = timeoutMs;
@@ -106,20 +106,20 @@ export class HttpCoreTransport {
       try {
         body = text ? JSON.parse(text) : null;
       } catch {
-        throw new Error(`Core returned non-JSON HTTP ${response.status}`);
+        throw new Error(`S3-CAM returned non-JSON HTTP ${response.status}`);
       }
       if (!response.ok) {
-        const message = body?.payload?.error ?? body?.error ?? `Core HTTP ${response.status}`;
+        const message = body?.payload?.error ?? body?.error ?? `S3-CAM HTTP ${response.status}`;
         throw Object.assign(new Error(message), {statusCode: response.status});
       }
       return verifyResponseEnvelope(body, requestEnvelope, this.controlKey, this.clockSkewMs);
-    }, remaining, `Core ${type}`);
+    }, remaining, `S3-CAM ${type}`);
   }
 
   async execute(job, deadline) {
     invariant(job?.target === 'flipper-link', 'job target must be flipper-link');
-    invariant(job?.route?.physical_owner === 'deck-cyd' && job.route?.fallback_physical_route === false,
-      'job route must be Deck-only');
+    invariant(job?.route?.physical_owner === 's3-cam' && job.route?.fallback_physical_route === false,
+      'job route must be S3-CAM-only');
     invariant(job?.flipper_program?.version === 1, 'materialized Flipper program is required');
     invariant(SHA256.test(job.flipper_program.sha256 ?? ''), 'Flipper program digest is missing');
     return this.send('/v1/jobs', 'job.execute', job, deadline);
@@ -135,9 +135,9 @@ export class HttpCoreTransport {
     const begin = await this.send('/v1/artifacts/begin', 'artifact.begin', {
       id, kind, sha256, size: bytes.length, requested_chunk_size: 4096,
     }, deadline);
-    invariant(/^[A-Za-z0-9._:-]{8,128}$/.test(begin?.upload_id ?? ''), 'Core did not return a valid artifact upload ID');
+    invariant(/^[A-Za-z0-9._:-]{8,128}$/.test(begin?.upload_id ?? ''), 'S3-CAM did not return a valid artifact upload ID');
     const chunkSize = Number.isInteger(begin.chunk_size) ? begin.chunk_size : 4096;
-    invariant(chunkSize >= 256 && chunkSize <= 16384, 'Core returned an unsafe artifact chunk size');
+    invariant(chunkSize >= 256 && chunkSize <= 16384, 'S3-CAM returned an unsafe artifact chunk size');
 
     for (let offset = 0; offset < bytes.length; offset += chunkSize) {
       const chunk = bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize));
@@ -150,7 +150,7 @@ export class HttpCoreTransport {
         chunk_sha256: chunkSha256,
       }, deadline);
       invariant(response?.upload_id === begin.upload_id && response?.next_offset === offset + chunk.length,
-        `Core artifact upload offset mismatch for ${id}`);
+        `S3-CAM artifact upload offset mismatch for ${id}`);
     }
 
     const committed = await this.send('/v1/artifacts/commit', 'artifact.commit', {
@@ -160,7 +160,7 @@ export class HttpCoreTransport {
       size: bytes.length,
     }, deadline);
     invariant(committed?.id === id && committed?.sha256 === sha256 && committed?.staged === true,
-      `Core did not confirm artifact integrity for ${id}`);
+      `S3-CAM did not confirm artifact integrity for ${id}`);
     return committed;
   }
 
