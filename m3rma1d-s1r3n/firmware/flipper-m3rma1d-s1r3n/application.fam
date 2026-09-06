@@ -6,8 +6,8 @@ App(
     requires=["gui"],
     stack_size=4 * 1024,
     fap_category="Tools",
-    fap_version="0.2.0-adl2",
-    fap_description="M3rMa1d S1r3n Codex + ADL 2.0 command deck and safety control surface",
+    fap_version="0.3.0-link2",
+    fap_description="M3rMa1d S1r3n Codex + ADL 2.0 command deck with MermaidLink UART",
     fap_author="918 Technologies",
     fap_weburl="https://github.com/BlockChain-BailBonds/BlockChainBailbonds",
 )
