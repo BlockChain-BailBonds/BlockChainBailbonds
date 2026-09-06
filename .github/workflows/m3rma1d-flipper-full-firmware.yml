@@ -1,0 +1,56 @@
+name: M3rMa1d S1r3n Full Flipper Firmware
+
+on:
+  push:
+    branches:
+      - feat/m3rma1d-s1r3n-flipper-firmware
+    paths:
+      - 'm3rma1d-s1r3n/firmware/flipper-full/**'
+      - '.github/workflows/m3rma1d-flipper-full-firmware.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout M3rMa1d source
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned official Flipper firmware
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/flipperdevices/flipperzero-firmware.git upstream
+          cd upstream
+          git checkout 7f0b6e1c14431708cfde75ae1ba13df59e868041
+          git submodule update --init --recursive
+
+      - name: Apply M3rMa1d firmware overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp -a m3rma1d-s1r3n/firmware/flipper-full/overlay/. upstream/
+          cp m3rma1d-s1r3n/firmware/flipper-full/fbt_options_local.py upstream/fbt_options_local.py
+
+      - name: Build full updater package
+        shell: bash
+        working-directory: upstream
+        run: |
+          set -euxo pipefail
+          ./fbt COMPACT=1 DEBUG=0 updater_package copro_dist
+
+      - name: Stage flashable outputs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p M3rMa1d-S1r3n-Flipper-Firmware
+          find upstream/dist -type f \( -name '*.tgz' -o -name '*.dfu' -o -name '*.bin' -o -name '*.elf' -o -name '*.json' \) -print -exec cp '{}' M3rMa1d-S1r3n-Flipper-Firmware/ \;
+          test -n "$(find M3rMa1d-S1r3n-Flipper-Firmware -type f -name '*.tgz' -print -quit)"
+          (cd M3rMa1d-S1r3n-Flipper-Firmware && sha256sum * > SHA256SUMS.txt)
+
+      - name: Upload full firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3rMa1d-S1r3n-Flipper-Zero-Firmware
+          path: M3rMa1d-S1r3n-Flipper-Firmware/
+          if-no-files-found: error
