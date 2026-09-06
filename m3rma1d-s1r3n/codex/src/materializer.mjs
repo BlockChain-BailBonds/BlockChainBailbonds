@@ -56,6 +56,10 @@ function validateRenderedOperations(operations) {
   }
 }
 
+function executableVerification(adapter) {
+  return ['bundled_verified', 'operator_verified', 'machine_verified'].includes(adapter.verification_status);
+}
+
 export class ExecutionMaterializer {
   constructor({catalog, artifacts, policy}) {
     this.catalog = catalog;
@@ -72,14 +76,19 @@ export class ExecutionMaterializer {
     const adapter = await this.catalog.getAdapter(job.adapter_id);
     invariant(adapter, `adapter unavailable: ${job.adapter_id}`);
     invariant(/^[a-f0-9]{64}$/.test(adapter.sha256 ?? ''), `adapter is not content-addressed: ${job.adapter_id}`);
-    invariant(adapter.verification_status === 'bundled_verified' || adapter.verification_status === 'operator_verified',
-      `adapter is not approved for execution: ${job.adapter_id}`);
+    invariant(executableVerification(adapter), `adapter is not approved for execution: ${job.adapter_id}`);
 
     if (adapter.origin === 'generated') {
       invariant(this.policy.allowGeneratedAdapterExecution === true, `generated adapter execution disabled: ${job.adapter_id}`);
-      invariant(job.approval === 'operator', `generated adapter requires operator approval: ${job.adapter_id}`);
-      if (this.policy.requireVisionForGeneratedAdapters) {
-        invariant(adapter.requires?.vision === true, `generated adapter requires Vision verification: ${job.adapter_id}`);
+      if (adapter.verification_status === 'machine_verified') {
+        invariant(adapter.autonomous_safe === true, `machine-verified adapter is not autonomous-safe: ${job.adapter_id}`);
+        invariant(['observe', 'local_state'].includes(adapter.risk), `machine verification cannot authorize ${adapter.risk}: ${job.adapter_id}`);
+        invariant(job.approval === 'auto', `machine-verified safe adapter must remain auto approval: ${job.adapter_id}`);
+      } else {
+        invariant(job.approval === 'operator', `generated adapter requires operator approval: ${job.adapter_id}`);
+        if (this.policy.requireVisionForGeneratedAdapters) {
+          invariant(adapter.requires?.vision === true, `generated adapter requires Vision verification: ${job.adapter_id}`);
+        }
       }
     }
 
@@ -108,10 +117,10 @@ export class ExecutionMaterializer {
 
     if (job.requires_approval) {
       invariant(operations.some((operation) => operation.op === 'deck_confirm'),
-        `approved job lacks an explicit deck_confirm operation: ${job.job_id}`);
+        `approved job lacks an explicit approval operation: ${job.job_id}`);
     }
 
-    const route = {logical_target: 'flipper', physical_owner: 'deck-cyd', fallback_physical_route: false};
+    const route = {logical_target: 'flipper', physical_owner: 's3-cam', fallback_physical_route: false};
     const flipperProgram = {
       version: 1,
       program_id: job.job_id,
