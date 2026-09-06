@@ -3,7 +3,7 @@ import {constantTimeEqual, invariant, nowIso, stableJson, withTimeout} from './u
 
 const ROUTE = Object.freeze({
   logical_target: 'flipper',
-  physical_owner: 'deck-cyd',
+  physical_owner: 'single-s3-cam',
   fallback_physical_route: false,
 });
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -118,8 +118,8 @@ export class HttpCoreTransport {
 
   async execute(job, deadline) {
     invariant(job?.target === 'flipper-link', 'job target must be flipper-link');
-    invariant(job?.route?.physical_owner === 'deck-cyd' && job.route?.fallback_physical_route === false,
-      'job route must be Deck-only');
+    invariant(job?.route?.physical_owner === 'single-s3-cam' && job.route?.fallback_physical_route === false,
+      'job route must be single-S3-CAM-only');
     invariant(job?.flipper_program?.version === 1, 'materialized Flipper program is required');
     invariant(SHA256.test(job.flipper_program.sha256 ?? ''), 'Flipper program digest is missing');
     return this.send('/v1/jobs', 'job.execute', job, deadline);
