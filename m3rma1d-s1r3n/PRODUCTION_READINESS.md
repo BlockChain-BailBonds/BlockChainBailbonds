@@ -1,117 +1,57 @@
-# M3rMa1d S1r3n Production Readiness Gate
+# M3rMa1d S1r3n Release Readiness
 
-This document is the release authority for the M3rMa1d S1r3n appliance. A feature, branch, pull request, or tag is not user-ready merely because host tests pass.
+This file is the release authority for the active M3rMa1d S1r3n appliance. Use only `PASS`, `FAIL`, `NOT TESTED`, or `BLOCKED`. Never infer a hardware PASS from compilation or simulation.
 
-Use only these statuses:
+## Active product
 
 ```text
-PASS
-FAIL
-NOT TESTED
-BLOCKED
+Browser point-and-click UI
+        |
+        v
+Codex/ADL host service
+        |
+        v
+GOOUUU ESP32-S3-CAM V1.5 N16R8 + OV3660
+        |
+        v
+Flipper Zero
 ```
+
+No CYD, C3/C5 node, second S3, separate Core board, or fallback ESP route is active.
 
 ## Release rule
 
-A release is permitted only when every required row below is `PASS`, the evidence location is populated, and the exact tested commit and firmware hashes are recorded. Any `FAIL`, `NOT TESTED`, or `BLOCKED` status prevents promotion to `main` or a production tag.
+Promotion to `main` or a user-ready tag is allowed only when every required gate is PASS and evidence is tied to the exact tested commit and artifact SHA-256 values.
 
-## Software supply chain
-
-| Gate | Required result | Current status | Evidence |
+| Gate | Required result | Current status | Evidence / next action |
 |---|---|---:|---|
-| Host deterministic tests | All tests pass on final commit | NOT TESTED | Latest final-commit CI run required |
-| Host production static gate | No mock/dry-run/raw-command substitute; route and pins validated | NOT TESTED | Latest final-commit CI run required |
-| Dependency policy | Runtime dependency inventory reviewed; immutable revisions recorded | NOT TESTED | `codex/catalog/libraries.json` plus review record |
-| Secret scan | No API key, control key, bearer token, Wi-Fi credential, certificate private key, or device key committed | NOT TESTED | Repository secret-scan report |
-| SAST | No unresolved critical/high findings in host or firmware | NOT TESTED | Scanner report tied to commit |
-| SBOM | Host and firmware SBOM generated and archived | NOT TESTED | Release artifact |
-| Reproducible host package | Clean machine produces identical package digest | NOT TESTED | Build log and SHA-256 |
+| Codex deterministic tests | `npm test` passes | FAIL | Previous CI: 9/10 passed; machine-verified adapter integrity test failed. Fix staged in Codex-ready pass; rerun CI required. |
+| Codex static production gate | `npm run check` passes | NOT TESTED | Was skipped after previous test failure; rerun on new commit. |
+| S3 firmware build | `pio run` succeeds from `m3rma1d-s1r3n` | NOT TESTED | Workflow previously pointed at deleted `firmware/s3-cam`; workflow corrected; rerun required. |
+| LittleFS UI build | `pio run -t buildfs` succeeds | NOT TESTED | New workflow gate; rerun required. |
+| Point-click approvals | Pending list + one-time decision works from S3 UI | NOT TESTED | Host endpoints/CORS added; browser integration test required. |
+| Host-to-S3 control plane | Signed status/inventory/job/artifact/STOP endpoints match `HttpCoreTransport` | BLOCKED | S3 firmware contract is incomplete. Highest-priority implementation task. |
+| Flipper typed execution | Real app inventory and typed RPC operations execute without raw shell | BLOCKED | Current S3 bridge only has bounded read-only CLI probes; implement typed protobuf RPC bridge. |
+| Closed-loop proof | Result has correlated job id, before/after state, observed success and evidence SHA-256 | BLOCKED | Requires completed S3/RPC execution path. |
+| Camera | OV3660 init/capture passes on actual GOOUUU V1.5 board | NOT TESTED | Compile is insufficient; record real hardware evidence. |
+| UART wiring | GPIO1 RX <- pin13 TX, GPIO2 TX -> pin14 RX, common GND, no power rail | NOT TESTED | Continuity + live link evidence required. |
+| STOP | Defaults asserted; preempts execution; persists/recoverable only by explicit resume | NOT TESTED | Real fault-injection test required. |
+| Replay/tamper | Duplicate nonce, stale timestamp, bad signature/route/artifact hash rejected | NOT TESTED | Add and run control-plane tests. |
+| App lifecycle | Harmless installed app start/input/exit works end-to-end | NOT TESTED | Real Flipper test required. |
+| New-app learning | Newly installed harmless FAP is discovered, adapted, tested and surfaced | NOT TESTED | Real newly installed app test required. |
+| Provisioning | Fresh tester can configure unique secrets without source edits | BLOCKED | Replace predictable setup AP credential with unique/provisioned secret. |
+| Reproducible artifacts | S3/Flipper artifacts + manifest SHA-256 archived | NOT TESTED | Generate after all final builds pass. |
+| User acceptance | Fresh authorized tester completes documented point-click flow | NOT TESTED | Final acceptance after all prior gates PASS. |
 
-## Host control plane
+## Security invariants
 
-| Gate | Required result | Current status | Evidence |
-|---|---|---:|---|
-| Required configuration | Placeholder and missing secrets rejected | NOT TESTED | Unit test/CI log |
-| OpenAI structured contract | Strict ADL schema request and refusal handling pass | NOT TESTED | Unit test/CI log |
-| Authorization integrity | Codex cannot alter operator authorization or resolution policy | NOT TESTED | Unit test/CI log |
-| Adapter integrity | Only content-addressed verified adapters materialize | NOT TESTED | Unit test/CI log |
-| Generated logic quarantine | Unpromoted adapter/script execution rejected | NOT TESTED | Unit test/CI log |
-| Artifact transfer | Chunk and full SHA-256 verification pass against real Core | NOT TESTED | Hardware-contract log |
-| Signed request/response | HMAC, timestamp, request nonce, route, and response payload checks pass | NOT TESTED | Unit and hardware-contract logs |
-| STOP behavior | Local and remote STOP assert and shutdown STOP confirmed | NOT TESTED | Hardware-contract log and video/logic trace |
-| Audit integrity | Hash-chain verification passes after successful and failed runs | NOT TESTED | Audit verification output |
-
-## Embedded firmware inventory
-
-Required production images:
-
-```text
-core-s3
-vision-s3-ov3660
-c5-guardian
-c5-watcher
-c5-arbiter
-deck-cyd
-```
-
-| Image | Required result | Current status | Evidence |
-|---|---|---:|---|
-| Core ESP32-S3 | Signed HTTPS/control-plane receiver, replay cache, leases, Deck route, C5 quorum, artifact staging | BLOCKED | Current repository firmware is not a complete production implementation |
-| Vision ESP32-S3 + OV3660 | Verified GOOUUU V1.5 pin map, camera init, authenticated capture endpoint, health telemetry | BLOCKED | Current repository firmware is not a complete production implementation |
-| C5 Guardian | ESP-IDF ESP32-C5 build, provisioned identity, authenticated health vote | BLOCKED | No production C5 image exists |
-| C5 Watcher | ESP-IDF ESP32-C5 build, independent STOP/lease observation | BLOCKED | No production C5 image exists |
-| C5 Arbiter | ESP-IDF ESP32-C5 build, quorum and split-brain decision | BLOCKED | No production C5 image exists |
-| CYD Deck | Display/touch UI, approval lease, STOP, official Flipper Expansion protocol, protobuf RPC interpreter, artifact staging | BLOCKED | Current repository firmware is not a complete production implementation |
-
-The older `sentinel-c3` source and legacy PlatformIO target are not valid for the three ESP32-C5 SuperMini devices and must not ship.
-
-## Hardware and electrical acceptance
-
-| Gate | Required result | Current status | Evidence |
-|---|---|---:|---|
-| CYD-to-Flipper wiring | GPIO27 TX to pin 14 RX; GPIO22 RX to pin 13 TX; common GND pin 18; no shared power output | NOT TESTED | Continuity photos and signed checklist |
-| Logic voltage | 3.3 V signal levels verified under power | NOT TESTED | Oscilloscope capture |
-| UART/Expansion framing | Heartbeat, baud negotiation, StartRpc, RPC data, StopRpc, recovery verified | NOT TESTED | Logic-analyzer trace |
-| CYD touchscreen | Calibration, approval, deny, STOP, timeout, reboot defaults | NOT TESTED | Test record and video |
-| Flipper compatibility | Exact Flipper firmware version recorded and all bundled RPC adapters pass | NOT TESTED | Device inventory and contract log |
-| Power isolation | CYD and Flipper independently powered; no supply backfeed | NOT TESTED | Meter measurements |
-| Brownout/reboot | Every node returns to STOP/fail-closed after power interruption | NOT TESTED | Test record |
-| Cable removal | UART removal reports bridge offline and cannot trigger fallback | NOT TESTED | Test record |
-
-## Security and fault injection
-
-| Gate | Required result | Current status | Evidence |
-|---|---|---:|---|
-| Replay attack | Duplicate nonce rejected | NOT TESTED | Packet trace and Core log |
-| Stale request | Expired timestamp and ADL lease rejected | NOT TESTED | Test log |
-| Signature tamper | Modified request and response rejected | NOT TESTED | Test log |
-| Route tamper | Any owner other than `deck-cyd` or fallback=true rejected | NOT TESTED | Test log |
-| Artifact tamper | Wrong chunk hash, wrong offset, wrong final hash, and changed staged file rejected | NOT TESTED | Test log |
-| Approval replay | Approval cannot authorize another job/program digest | NOT TESTED | Test log |
-| C5 loss | Loss of any required node revokes readiness and active execution | NOT TESTED | Packet/logic trace |
-| Split brain | Conflicting Core/Deck state cannot produce execution | NOT TESTED | Fault-injection log |
-| Vision loss | Vision-required job stops or requests operator; never silently succeeds | NOT TESTED | Test log |
-| Host loss | Core/Deck stop after lease expiration | NOT TESTED | Timed trace |
-| Flipper reset | RPC link recovers without replaying prior operations | NOT TESTED | Test log |
-
-## End-user acceptance
-
-| Gate | Required result | Current status | Evidence |
-|---|---|---:|---|
-| Installation | A new authorized tester can install from written instructions | NOT TESTED | Tester record |
-| Provisioning | Unique device identities, keys, certificates, Wi-Fi, and operator account provisioned without source edits | NOT TESTED | Provisioning log |
-| Read-only run | Device info and storage inventory succeed end to end | NOT TESTED | Hardware contract output |
-| App lifecycle | Known harmless installed app starts, receives approved input, and exits | NOT TESTED | Run/audit/video evidence |
-| Artifact stage | Approved owned file is staged and verified by readback | NOT TESTED | Hash comparison |
-| Approval UX | Operator can understand target, risk, artifact, and action before approving | NOT TESTED | User-test report |
-| STOP UX | Operator STOP is visible, immediate, persistent, and recoverable only by explicit resume | NOT TESTED | User-test report |
-| Audit export | Operator can verify and export run evidence | NOT TESTED | Exported evidence bundle |
+Raw shell/unrestricted CLI stays unavailable to Codex and the browser. Observe/local-state generated adapters require correlated device proof before autonomous activation. Physical-output/transmit actions require explicit per-job approval plus applicable owned-asset/region/frequency policy. Restricted destructive/access-bypass/credential-dump/jamming/brute-force functions stay denied. STOP preempts execution and there is no fallback physical route.
 
 ## Current release decision
 
 ```text
 RELEASE: BLOCKED
-REASON: production embedded firmware and physical hardware evidence are incomplete.
+REASON: deterministic CI must be rerun, and the authenticated S3 control plane + typed Flipper RPC + physical hardware evidence are incomplete.
 ```
 
-The host control-plane hardening can continue and deterministic tests can pass independently. That does not change the release decision until the embedded and physical gates pass.
+See root `AGENTS.md` for the Codex finish sequence.

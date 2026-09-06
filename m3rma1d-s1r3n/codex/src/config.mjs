@@ -20,6 +20,10 @@ export async function loadConfig(env = process.env) {
   const controlKey = requiredValue(env.S1R3N_CONTROL_KEY, 'S1R3N_CONTROL_KEY', 32);
   const openAiKey = requiredValue(env.OPENAI_API_KEY, 'OPENAI_API_KEY', 20);
   const coreUrl = requiredValue(env.S1R3N_CORE_URL, 'S1R3N_CORE_URL');
+  const corsOrigins = String(env.S1R3N_CORS_ORIGINS ?? 'http://192.168.4.1')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   return {
     packageRoot,
@@ -32,6 +36,7 @@ export async function loadConfig(env = process.env) {
       bindPort: boundedInteger(env.S1R3N_BIND_PORT, defaults.service.bind_port, 1, 65535, 'bind port'),
       requestBodyLimit: defaults.service.request_body_limit,
       apiToken,
+      corsOrigins,
     },
     openai: {
       apiKey: openAiKey,

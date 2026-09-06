@@ -213,7 +213,10 @@ export function validateScript(script) {
 
 function baseAdapter(adapter) {
   const copy = structuredClone(adapter);
-  for (const key of ['origin', 'verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at', 'test_evidence_sha256']) {
+  for (const key of [
+    'origin', 'verification_status', 'sha256', 'artifact_id', 'verified_by', 'verified_at',
+    'test_evidence_sha256', 'autonomous_safe',
+  ]) {
     delete copy[key];
   }
   return copy;
@@ -282,6 +285,7 @@ export class CatalogService {
         verified_by: adapter.verified_by,
         verified_at: adapter.verified_at,
         test_evidence_sha256: adapter.test_evidence_sha256,
+        autonomous_safe: adapter.autonomous_safe === true,
         sha256: adapter.sha256,
       });
       this.catalog.apps[adapter.app_id] ??= {display_name: adapter.app_id, discovered: true, functions: {}};
@@ -423,10 +427,11 @@ export class CatalogService {
       'automatic adapter activation is limited to observe/local_state risk');
     invariant(!adapter.operations.some((operation) => operation.op === 'deck_confirm'),
       'automatic adapters must not contain approval operations');
-    const normalized = normalizeAdapter({...adapter, autonomous_safe: true}, {
+    const normalized = normalizeAdapter(adapter, {
       origin: 'generated',
       verification_status: 'machine_verified',
       artifact_id: staged.artifact_id,
+      autonomous_safe: true,
       sha256: staged.sha256,
       verified_by: 'codex-auto-integrator',
       verified_at: new Date().toISOString(),

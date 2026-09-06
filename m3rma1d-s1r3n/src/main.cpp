@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include "camera_handler.h"
 #include "codex_autonomous.h"
 #include "config.h"
