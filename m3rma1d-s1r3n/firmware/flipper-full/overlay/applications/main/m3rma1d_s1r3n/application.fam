@@ -1,0 +1,9 @@
+App(
+    appid="m3rma1d_s1r3n",
+    name="M3rMa1d S1r3n",
+    apptype=FlipperAppType.APP,
+    entry_point="m3rma1d_s1r3n_app",
+    requires=["gui"],
+    stack_size=2 * 1024,
+    order=10,
+)
