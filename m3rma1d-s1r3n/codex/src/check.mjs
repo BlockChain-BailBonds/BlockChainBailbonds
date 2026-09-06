@@ -13,17 +13,24 @@ const required = [
   'catalog/frequencies.json',
   'catalog/libraries.json',
   'schemas/adapter.schema.json',
+  'schemas/app-capability-plan.schema.json',
   'schemas/script.schema.json',
   'prompts/planner.md',
+  'prompts/adapter-generator.md',
+  'prompts/app-capability-discovery.md',
 ];
 for (const relative of required) await readFile(path.join(root, relative));
 
 const defaults = await readJson(path.join(root, 'config', 'default.json'));
 if (Object.hasOwn(defaults.execution, 'dry_run')) throw new Error('production defaults must not contain dry_run');
-if (defaults.execution.physical_owner !== 'deck-cyd' || defaults.execution.allow_fallback_physical_route !== false) {
-  throw new Error('production route must be Deck-only with no fallback');
+if (defaults.execution.physical_owner !== 's3-cam' || defaults.execution.allow_fallback_physical_route !== false) {
+  throw new Error('production route must be S3-CAM-only with no fallback');
 }
-if (defaults.transport.core_url !== '') throw new Error('production Core URL must be supplied by environment, not embedded defaults');
+if (defaults.execution.require_flipper_online !== true) throw new Error('production defaults must require the Flipper online');
+for (const obsolete of ['require_safety_quorum', 'required_safety_nodes', 'require_deck_online']) {
+  if (Object.hasOwn(defaults.execution, obsolete)) throw new Error(`obsolete multi-board execution setting remains: ${obsolete}`);
+}
+if (defaults.transport.core_url !== '') throw new Error('production S3-CAM URL must be supplied by environment, not embedded defaults');
 if (defaults.transport.allow_insecure_local_http !== false) throw new Error('insecure local HTTP must default to false');
 
 const adapterCatalog = await readJson(path.join(root, 'catalog', 'adapters.json'));
@@ -66,9 +73,11 @@ for (const [libraryId, library] of Object.entries(libraries)) {
 const sourceDir = path.join(root, 'src');
 const sourceFiles = (await readdir(sourceDir)).filter((name) => name.endsWith('.mjs') && name !== 'check.mjs');
 const forbiddenRuntime = /\b(DryRunTransport|DenyApprovalService|ConsoleApprovalService|MockCore|dryRun)\b|S1R3N_DRY_RUN|mock-core\.mjs/i;
+const obsoleteTopology = /physical_owner\s*[:=]\s*['"]deck-cyd['"]|requireDeckOnline|requireSafetyQuorum|requiredSafetyNodes/;
 for (const name of sourceFiles) {
   const text = await readFile(path.join(sourceDir, name), 'utf8');
   if (forbiddenRuntime.test(text)) throw new Error(`development substitute remains in production source: src/${name}`);
+  if (obsoleteTopology.test(text)) throw new Error(`obsolete Deck/C5 topology remains in production source: src/${name}`);
 }
 
 const packageJson = await readJson(path.join(root, 'package.json'));
@@ -77,31 +86,35 @@ for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
 }
 
 const route = await readJson(path.join(projectRoot, 'adl', 'hardware-routing.json'));
-if (route.physical_owner !== 'deck-cyd' || route.fallback_physical_route !== false) {
-  throw new Error('ADL hardware routing is not locked to the CYD Deck');
+if (route.physical_owner !== 's3-cam' || route.fallback_physical_route !== false) {
+  throw new Error('ADL hardware routing is not locked to the S3-CAM');
 }
-if (route.bridge?.deck_rx_gpio !== 22 || route.bridge?.deck_tx_gpio !== 27 ||
+if (JSON.stringify(route.topology) !== JSON.stringify(['s3-cam', 'flipper-zero'])) {
+  throw new Error('ADL topology must contain exactly s3-cam and flipper-zero');
+}
+if (route.bridge?.s3_rx_gpio !== 1 || route.bridge?.s3_tx_gpio !== 2 ||
     route.bridge?.flipper_tx_pin !== 13 || route.bridge?.flipper_rx_pin !== 14 ||
-    route.bridge?.power_connection !== false) {
-  throw new Error('ADL hardware routing does not match the approved CYD-to-Flipper wiring');
+    route.bridge?.power_connection !== false || route.bridge?.common_ground_required !== true) {
+  throw new Error('ADL hardware routing does not match the approved S3-CAM-to-Flipper wiring');
+}
+if (route.codex?.shell !== false || route.codex?.raw_cli !== false || route.codex?.stop_preempts_all !== true) {
+  throw new Error('ADL Codex policy must deny shell/raw CLI and make STOP preemptive');
 }
 
-const removedNonProductionFiles = [
-  path.join(projectRoot, 'platformio.ini'),
-  path.join(projectRoot, 'firmware', 'core-s3', 'src', 'main.cpp'),
+const obsoleteFirmwareFiles = [
+  path.join(projectRoot, 'firmware', 'c5-guardian', 'main', 'CMakeLists.txt'),
+  path.join(projectRoot, 'firmware', 'deck-cyd', 'platformio.ini'),
   path.join(projectRoot, 'firmware', 'deck-cyd', 'src', 'main.cpp'),
-  path.join(projectRoot, 'firmware', 'vision-s3cam', 'src', 'main.cpp'),
-  path.join(projectRoot, 'firmware', 'sentinel-c3', 'src', 'main.cpp'),
-  path.join(projectRoot, 'shared', 'protocol.hpp'),
-  path.join(projectRoot, 'shared', 'protocol.cpp'),
+  path.join(projectRoot, 'firmware', 'vision-s3-ov3660', 'platformio.ini'),
+  path.join(projectRoot, 'firmware', 'vision-s3-ov3660', 'src', 'main.cpp'),
 ];
-for (const file of removedNonProductionFiles) {
+for (const file of obsoleteFirmwareFiles) {
   try {
     await readFile(file);
-    throw new Error(`obsolete non-production firmware file remains: ${path.relative(projectRoot, file)}`);
+    throw new Error(`obsolete multi-board firmware file remains: ${path.relative(projectRoot, file)}`);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
 }
 
-console.log(`M3rMa1d S1r3n production static checks passed: ${Object.keys(adapters).length} verified bundled adapters, ${Object.keys(libraries).length} pinned libraries; obsolete firmware scaffolds absent`);
+console.log(`M3rMa1d S1r3n production static checks passed: ${Object.keys(adapters).length} verified bundled adapters, ${Object.keys(libraries).length} pinned libraries; S3-CAM-only route enforced`);
