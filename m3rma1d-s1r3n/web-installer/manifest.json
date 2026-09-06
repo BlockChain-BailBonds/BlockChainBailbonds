@@ -1,7 +1,7 @@
 {
-  "schema": "m3rma1d.release-manifest.v1",
-  "build_id": "dev-unreleased",
-  "commit": "540930d61bbfe207041fc97f9c8a59c2a176dc61",
+  "schema": "m3rma1d.release-manifest.v2",
+  "build_id": "single-s3-flipper-dev",
+  "commit": "51698d8d302f6f3921aff0743f2f5441bf669848",
   "generated_at": "2026-09-06T00:00:00Z",
   "signature_required": true,
   "signing": {
@@ -9,35 +9,52 @@
     "public_key_spki_b64": "",
     "signature_b64": ""
   },
+  "topology": ["s3-cam", "flipper-zero"],
   "roles": {
-    "core-s3": {
+    "s3-cam": {
+      "label": "GOOUUU ESP32-S3-CAM V1.5 N16R8 + OV3660",
       "chip": "ESP32-S3",
       "baud": 115200,
       "flash_baud": 921600,
       "available": false,
       "images": [],
       "console_checks": {
-        "identity": ["M3rMa1d S1r3n Core"],
+        "identity": ["M3rMa1d S1r3n S3-CAM"],
         "boot": ["STOP asserted"],
-        "stop": ["STOP asserted"]
+        "heartbeat": ["S3CAM_HEARTBEAT"],
+        "stop": ["STOP asserted"],
+        "codex": ["CODEX"],
+        "flipper": ["FLIPPER"]
       },
-      "manual_only_tests": ["wiring","logic","power","heartbeat","brownout","cable","uart","flipper","approval","readonly","audit"]
+      "manual_only_tests": ["wiring","logic","power","brownout","cable","camera","approval","audit"]
     },
-    "vision-s3-ov3660": {
-      "chip": "ESP32-S3",
-      "baud": 115200,
-      "flash_baud": 921600,
+    "flipper-zero": {
+      "label": "Flipper Zero + M3rMa1d S1r3n FAP",
+      "chip": "STM32WB55",
+      "baud": 230400,
+      "flash_baud": 0,
       "available": false,
-      "images": [],
-      "console_checks": {
-        "identity": ["Vision"],
-        "boot": ["STOP"]
+      "artifact": {
+        "name": "m3rma1d_s1r3n.fap",
+        "version": "0.3.0",
+        "sha256": "e1fad24c2ee91f85def1201b9c6e6adb08a589722a687e497a5bff6c2eef904f"
       },
-      "manual_only_tests": ["wiring","logic","power","heartbeat","brownout","cable","uart","flipper","approval","readonly","audit"]
-    },
-    "c5-guardian": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Guardian"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
-    "c5-watcher": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Watcher"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
-    "c5-arbiter": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Arbiter"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
-    "deck-cyd": {"chip":"ESP32","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Deck"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]}
+      "console_checks": {
+        "identity": ["M3rMa1d S1r3n"],
+        "uart": ["MermaidLink"],
+        "stop": ["STOP"],
+        "codex": ["Codex"]
+      },
+      "manual_only_tests": ["wiring","logic","power","brownout","cable","approval","audit"]
+    }
+  },
+  "codex": {
+    "mode": "autonomous_registered_capabilities",
+    "adl_version": "2.0",
+    "shell": false,
+    "raw_cli": false,
+    "requires_verified_adapter": true,
+    "requires_active_lease": true,
+    "stop_preempts_all": true
   }
 }
