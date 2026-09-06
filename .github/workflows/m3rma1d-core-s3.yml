@@ -1,4 +1,4 @@
-name: M3rMa1d S1r3n Core S3
+name: M3rMa1d S1r3n S3-CAM
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - feat/m3rma1d-s1r3n-integrated-firmware
       - main
     paths:
-      - 'm3rma1d-s1r3n/firmware/core-s3/**'
+      - 'm3rma1d-s1r3n/firmware/s3-cam/**'
       - '.github/workflows/m3rma1d-core-s3.yml'
   pull_request:
     paths:
-      - 'm3rma1d-s1r3n/firmware/core-s3/**'
+      - 'm3rma1d-s1r3n/firmware/s3-cam/**'
       - '.github/workflows/m3rma1d-core-s3.yml'
   workflow_dispatch:
 
@@ -18,12 +18,12 @@ permissions:
   contents: read
 
 jobs:
-  build-core-s3:
+  build-s3-cam:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: m3rma1d-s1r3n/firmware/core-s3
+        working-directory: m3rma1d-s1r3n/firmware/s3-cam
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,14 +31,14 @@ jobs:
           python-version: '3.12'
       - name: Install PlatformIO
         run: python -m pip install --upgrade platformio
-      - name: Build Core S3
+      - name: Build S3-CAM
         run: pio run
       - name: Archive firmware binaries
         uses: actions/upload-artifact@v4
         with:
-          name: M3rMa1d-Core-S3-${{ github.sha }}
+          name: M3rMa1d-S3-CAM-${{ github.sha }}
           path: |
-            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/firmware.bin
-            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/bootloader.bin
-            m3rma1d-s1r3n/firmware/core-s3/.pio/build/core-s3/partitions.bin
+            m3rma1d-s1r3n/firmware/s3-cam/.pio/build/s3-cam/firmware.bin
+            m3rma1d-s1r3n/firmware/s3-cam/.pio/build/s3-cam/bootloader.bin
+            m3rma1d-s1r3n/firmware/s3-cam/.pio/build/s3-cam/partitions.bin
           if-no-files-found: error
