@@ -1,0 +1,43 @@
+{
+  "schema": "m3rma1d.release-manifest.v1",
+  "build_id": "dev-unreleased",
+  "commit": "540930d61bbfe207041fc97f9c8a59c2a176dc61",
+  "generated_at": "2026-09-06T00:00:00Z",
+  "signature_required": true,
+  "signing": {
+    "algorithm": "Ed25519",
+    "public_key_spki_b64": "",
+    "signature_b64": ""
+  },
+  "roles": {
+    "core-s3": {
+      "chip": "ESP32-S3",
+      "baud": 115200,
+      "flash_baud": 921600,
+      "available": false,
+      "images": [],
+      "console_checks": {
+        "identity": ["M3rMa1d S1r3n Core"],
+        "boot": ["STOP asserted"],
+        "stop": ["STOP asserted"]
+      },
+      "manual_only_tests": ["wiring","logic","power","heartbeat","brownout","cable","uart","flipper","approval","readonly","audit"]
+    },
+    "vision-s3-ov3660": {
+      "chip": "ESP32-S3",
+      "baud": 115200,
+      "flash_baud": 921600,
+      "available": false,
+      "images": [],
+      "console_checks": {
+        "identity": ["Vision"],
+        "boot": ["STOP"]
+      },
+      "manual_only_tests": ["wiring","logic","power","heartbeat","brownout","cable","uart","flipper","approval","readonly","audit"]
+    },
+    "c5-guardian": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Guardian"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
+    "c5-watcher": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Watcher"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
+    "c5-arbiter": {"chip":"ESP32-C5","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Arbiter"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]},
+    "deck-cyd": {"chip":"ESP32","baud":115200,"flash_baud":460800,"available":false,"images":[],"console_checks":{"identity":["Deck"]},"manual_only_tests":["wiring","logic","power","heartbeat","stop","brownout","cable","uart","flipper","approval","readonly","audit"]}
+  }
+}
