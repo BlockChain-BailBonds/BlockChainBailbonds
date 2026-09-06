@@ -1,7 +1,7 @@
 {
   "service": {
     "name": "M3rMa1d S1r3n Codex",
-    "version": "1.0.0-rc.1",
+    "version": "1.1.0-rc.1",
     "bind_host": "127.0.0.1",
     "bind_port": 9183,
     "request_body_limit": 262144
@@ -16,9 +16,9 @@
   "execution": {
     "max_concurrent_runs": 1,
     "max_run_ms": 600000,
-    "require_safety_quorum": true,
-    "required_safety_nodes": 3,
-    "physical_owner": "deck-cyd",
+    "require_safety_quorum": false,
+    "required_safety_nodes": 0,
+    "physical_owner": "single-s3-cam",
     "allow_fallback_physical_route": false
   },
   "policy": {
