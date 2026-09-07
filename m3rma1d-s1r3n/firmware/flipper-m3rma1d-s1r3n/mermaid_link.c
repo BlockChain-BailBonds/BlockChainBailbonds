@@ -30,6 +30,8 @@ struct MermaidLink {
     MermaidStatusCallback status_cb;
     MermaidCatalogCallback catalog_cb;
     MermaidResultCallback result_cb;
+    MermaidActionCallback action_cb;
+    MermaidStopCallback stop_cb;
     void* callback_context;
 };
 
@@ -93,6 +95,58 @@ static bool send_frame(MermaidLink* link, MermaidMsgType type, const uint8_t* pa
     return true;
 }
 
+bool mermaid_link_send_action_result(
+    MermaidLink* link,
+    uint32_t job_id,
+    int16_t code,
+    const char* text) {
+    if(!link) return false;
+    uint8_t payload[MERMAID_LINK_MAX_PAYLOAD];
+    write_u32(payload, job_id);
+    write_u16(payload + 4, (uint16_t)code);
+    const size_t max_text = MERMAID_LINK_MAX_PAYLOAD - 6U;
+    const size_t text_len = text ? strnlen(text, max_text) : 0U;
+    if(text_len) memcpy(payload + 6, text, text_len);
+    return send_frame(link, MermaidMsgActionResult, payload, (uint16_t)(6U + text_len));
+}
+
+static void dispatch_action_request(MermaidLink* link, const MermaidFrame* frame) {
+    if(frame->length < 8U) return;
+    const uint32_t job_id = read_u32(&frame->payload[0]);
+    const uint16_t action_id = read_u16(&frame->payload[4]);
+    const uint16_t arg_len = read_u16(&frame->payload[6]);
+    if(arg_len > MERMAID_LINK_MAX_PAYLOAD - 8U || frame->length != 8U + arg_len) {
+        mermaid_link_send_action_result(link, job_id, -40, "invalid action frame");
+        return;
+    }
+    char argument[MERMAID_LINK_MAX_PAYLOAD - 7U];
+    if(arg_len) memcpy(argument, &frame->payload[8], arg_len);
+    argument[arg_len] = '\0';
+
+    if(link->action_cb) {
+        link->action_cb(job_id, action_id, argument, link->callback_context);
+        return;
+    }
+
+    if(action_id == MermaidActionTransportPing) {
+        mermaid_link_send_action_result(link, job_id, 0, "ok:mermaid-link-v2");
+        return;
+    }
+    if(action_id == MermaidActionRfTransmitOwnedProfile) {
+        mermaid_link_send_action_result(link, job_id, -70, "owned RF handler not authorized");
+        return;
+    }
+    if(action_id == MermaidActionCredentialReference) {
+        mermaid_link_send_action_result(link, job_id, -80, "credential handler not authorized");
+        return;
+    }
+    if(action_id == MermaidActionAuthValidateOnce) {
+        mermaid_link_send_action_result(link, job_id, -90, "auth-test handler not authorized");
+        return;
+    }
+    mermaid_link_send_action_result(link, job_id, -41, "typed handler unavailable");
+}
+
 static void dispatch_frame(MermaidLink* link, const MermaidFrame* frame) {
     if(frame->type == MermaidMsgStatus && frame->length == 17U) {
         const uint8_t flags = frame->payload[0];
@@ -125,6 +179,11 @@ static void dispatch_frame(MermaidLink* link, const MermaidFrame* frame) {
         if(copy_len) memcpy(text, &frame->payload[6], copy_len);
         text[copy_len] = '\0';
         if(link->result_cb) link->result_cb(job_id, code, text, link->callback_context);
+    } else if(frame->type == MermaidMsgActionRequest) {
+        dispatch_action_request(link, frame);
+    } else if(frame->type == MermaidMsgStop) {
+        const uint32_t job_id = frame->length >= 4U ? read_u32(frame->payload) : 0U;
+        if(link->stop_cb) link->stop_cb(job_id, link->callback_context);
     }
 }
 
@@ -248,6 +307,15 @@ void mermaid_link_set_callbacks(
     link->catalog_cb = catalog_cb;
     link->result_cb = result_cb;
     link->callback_context = context;
+}
+
+void mermaid_link_set_action_callbacks(
+    MermaidLink* link,
+    MermaidActionCallback action_cb,
+    MermaidStopCallback stop_cb) {
+    if(!link) return;
+    link->action_cb = action_cb;
+    link->stop_cb = stop_cb;
 }
 
 void mermaid_link_poll(MermaidLink* link) {
