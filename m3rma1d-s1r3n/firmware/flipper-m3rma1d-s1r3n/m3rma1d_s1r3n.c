@@ -85,6 +85,67 @@ static void result_callback(uint32_t job_id, int16_t code, const char* text, voi
     }
 }
 
+static void stop_callback(uint32_t job_id, void* context) {
+    MermaidApp* app = context;
+    app->stop_asserted = true;
+    app->last_job_id = job_id;
+    set_event(app, "stop.remote");
+}
+
+static void action_callback(uint32_t job_id, uint16_t action_id, const char* argument, void* context) {
+    MermaidApp* app = context;
+    app->last_job_id = job_id;
+
+    if(action_id == MermaidActionTransportPing) {
+        mermaid_link_send_action_result(app->link, job_id, 0, "ok:mermaid-link-v2");
+        set_event(app, "rpc.ping");
+        return;
+    }
+
+    if(app->stop_asserted) {
+        mermaid_link_send_action_result(app->link, job_id, -10, "STOP asserted");
+        set_event(app, "rpc.stop_denied");
+        return;
+    }
+
+    if(action_id == MermaidActionSystemDeviceInfo) {
+        if(argument && argument[0]) {
+            mermaid_link_send_action_result(app->link, job_id, -13, "unexpected argument");
+        } else {
+            mermaid_link_send_action_result(app->link, job_id, 0, "Flipper Zero; M3rMa1d FAP; link=2");
+        }
+        set_event(app, "rpc.device_info");
+        return;
+    }
+
+    /*
+     * The transport vocabulary intentionally contains the production action IDs now,
+     * but unimplemented device services fail closed. In particular, RF output,
+     * credential references, and authentication validation are never converted into
+     * arbitrary commands or raw payloads by the FAP. They require a separately
+     * reviewed owned/test adapter and explicit approval before a concrete handler can
+     * be registered.
+     */
+    switch(action_id) {
+    case MermaidActionRfTransmitOwnedProfile:
+        mermaid_link_send_action_result(app->link, job_id, -70, "owned RF handler not authorized");
+        set_event(app, "rpc.rf_denied");
+        break;
+    case MermaidActionCredentialReference:
+        mermaid_link_send_action_result(app->link, job_id, -80, "credential metadata handler not authorized");
+        set_event(app, "rpc.cred_denied");
+        break;
+    case MermaidActionAuthValidateOnce:
+        mermaid_link_send_action_result(app->link, job_id, -90, "auth-test handler not authorized");
+        set_event(app, "rpc.auth_denied");
+        break;
+    default:
+        mermaid_link_send_action_result(app->link, job_id, -50, "typed capability handler unavailable");
+        set_event(app, "rpc.unsupported");
+        break;
+    }
+}
+
 static const char* page_name(MermaidPage page) {
     switch(page) {
     case PageHome: return "COMMAND DECK";
@@ -286,7 +347,14 @@ int32_t m3rma1d_s1r3n_app(void* p) {
 
     app->link = mermaid_link_alloc();
     furi_check(app->link);
-    mermaid_link_set_callbacks(app->link, status_callback, catalog_callback, result_callback, app);
+    mermaid_link_set_callbacks(
+        app->link,
+        status_callback,
+        catalog_callback,
+        result_callback,
+        action_callback,
+        stop_callback,
+        app);
     if(mermaid_link_is_open(app->link)) {
         mermaid_link_request_status(app->link);
     } else {
