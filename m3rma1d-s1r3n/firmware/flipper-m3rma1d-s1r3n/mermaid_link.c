@@ -105,7 +105,10 @@ bool mermaid_link_send_action_result(
     write_u32(payload, job_id);
     write_u16(payload + 4, (uint16_t)code);
     const size_t max_text = MERMAID_LINK_MAX_PAYLOAD - 6U;
-    const size_t text_len = text ? strnlen(text, max_text) : 0U;
+    size_t text_len = 0U;
+    if(text) {
+        while(text_len < max_text && text[text_len] != '\0') text_len++;
+    }
     if(text_len) memcpy(payload + 6, text, text_len);
     return send_frame(link, MermaidMsgActionResult, payload, (uint16_t)(6U + text_len));
 }
