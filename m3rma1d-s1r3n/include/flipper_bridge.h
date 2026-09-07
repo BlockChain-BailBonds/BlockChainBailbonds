@@ -8,8 +8,7 @@ constexpr uint8_t MERMAID_LINK_VERSION = 2;
 constexpr uint16_t MERMAID_LINK_MAX_PAYLOAD = 96;
 
 enum class FlipperAction : uint16_t {
-    TransportPing = 1,
-    SystemDeviceInfo = 10,
+    SystemDeviceInfo = 1,
     SystemPowerInfo = 11,
     StorageInfo = 20,
     StorageList = 21,
@@ -23,6 +22,7 @@ enum class FlipperAction : uint16_t {
     RfTransmitOwnedProfile = 70,
     CredentialReference = 80,
     AuthValidateOnce = 90,
+    TransportPing = 100,
 };
 
 struct FlipperResult {
