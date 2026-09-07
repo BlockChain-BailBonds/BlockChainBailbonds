@@ -5,16 +5,19 @@ namespace m3rma1d {
 
 void FlipperBridge::begin() {
     serial_.begin(FLIPPER_BAUD, SERIAL_8N1, FLIPPER_RX_GPIO, FLIPPER_TX_GPIO);
-    last_rx_ms_ = millis();
+    last_rx_ms_ = 0;
+    seen_rx_ = false;
     stop_asserted_ = true;
-    // Stock/custom firmware must expose the Flipper CLI or RPC transport on UART.
-    // Start with a harmless identity probe; no arbitrary command surface is exposed to Codex.
+    // This is a bounded commissioning identity probe only. General production
+    // execution remains blocked until the typed Expansion/protobuf RPC bridge
+    // is active; no free-form command surface is exposed to Codex or the UI.
     serial_.print("device_info\r");
 }
 
 void FlipperBridge::poll() {
     while(serial_.available()) {
         const char c = static_cast<char>(serial_.read());
+        seen_rx_ = true;
         last_rx_ms_ = millis();
         if(c == '\n') line_ = "";
         else if(c != '\r' && line_.length() < 512) line_ += c;
@@ -23,7 +26,7 @@ void FlipperBridge::poll() {
 }
 
 bool FlipperBridge::linked() const {
-    return (millis() - last_rx_ms_) <= FLIPPER_STALE_MS;
+    return seen_rx_ && (millis() - last_rx_ms_) <= FLIPPER_STALE_MS;
 }
 
 void FlipperBridge::assert_stop(uint32_t job_id) {
@@ -41,9 +44,9 @@ bool FlipperBridge::execute(uint32_t job_id, uint16_t action_id, const String& a
     if(stop_asserted_) { result.code = -10; result.text = "STOP asserted"; return false; }
     if(!linked()) { result.code = -11; result.text = "Flipper offline"; return false; }
 
-    // The single-board firmware deliberately exposes typed actions rather than a shell.
-    // Action IDs 1..4 map to read-only stock CLI probes. App/UI automation is resolved by
-    // the Codex adapter layer and the Flipper RPC/tool transport, not free-form strings.
+    // Only the bounded read-only compatibility probes below may use the
+    // commissioning CLI path. Every other operation fails closed until the
+    // production typed Expansion/protobuf RPC adapter is implemented.
     String command;
     switch(action_id) {
         case 1: command = "device_info"; break;
@@ -52,7 +55,7 @@ bool FlipperBridge::execute(uint32_t job_id, uint16_t action_id, const String& a
         case 4: command = "help"; break;
         default:
             result.code = -12;
-            result.text = "typed action requires RPC adapter";
+            result.text = "typed action requires protobuf RPC adapter";
             return false;
     }
     if(argument.length()) {
@@ -69,6 +72,7 @@ bool FlipperBridge::execute(uint32_t job_id, uint16_t action_id, const String& a
     while(millis() - start < limit) {
         while(serial_.available()) {
             const char c = static_cast<char>(serial_.read());
+            seen_rx_ = true;
             last_rx_ms_ = millis();
             if(c == '\n' && response.length()) {
                 result.code = 0;

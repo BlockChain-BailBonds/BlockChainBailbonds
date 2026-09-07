@@ -108,11 +108,16 @@ export class HttpCoreTransport {
       } catch {
         throw new Error(`S3-CAM returned non-JSON HTTP ${response.status}`);
       }
+
+      // Success and operational error responses are both authenticated. This
+      // prevents an intermediary from replacing a real signed S3 result with
+      // an unsigned error body that the host would otherwise trust.
+      const verifiedPayload = verifyResponseEnvelope(body, requestEnvelope, this.controlKey, this.clockSkewMs);
       if (!response.ok) {
-        const message = body?.payload?.error ?? body?.error ?? `S3-CAM HTTP ${response.status}`;
-        throw Object.assign(new Error(message), {statusCode: response.status});
+        const message = verifiedPayload?.error ?? `S3-CAM HTTP ${response.status}`;
+        throw Object.assign(new Error(message), {statusCode: response.status, payload: verifiedPayload});
       }
-      return verifyResponseEnvelope(body, requestEnvelope, this.controlKey, this.clockSkewMs);
+      return verifiedPayload;
     }, remaining, `S3-CAM ${type}`);
   }
 

@@ -6,12 +6,15 @@
 
 namespace m3rma1d {
 WebUi::WebUi(CodexAutonomous& codex, FlipperBridge& bridge)
-    : server_(HTTP_PORT), codex_(codex), bridge_(bridge) {}
+    : server_(HTTP_PORT), codex_(codex), bridge_(bridge), control_(server_, bridge_) {}
 
 bool WebUi::begin() {
     if(!LittleFS.begin(true)) return false;
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(AP_SSID, AP_PASSWORD);
+    const char* control_headers[] = {"x-s1r3n-protocol"};
+    server_.collectHeaders(control_headers, 1);
+    control_.begin();
     routes();
     server_.begin();
     return true;
@@ -63,6 +66,7 @@ void WebUi::routes() {
         body += escaped + "\"}";
         server_.send(r.code == 0 ? 200 : 422, "application/json", body);
     });
+    control_.register_routes();
 }
 
 void WebUi::poll() { server_.handleClient(); }

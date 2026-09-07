@@ -23,6 +23,7 @@ public:
 private:
     HardwareSerial& serial_;
     uint32_t last_rx_ms_ = 0;
+    bool seen_rx_ = false;
     bool stop_asserted_ = true;
     String line_;
 };

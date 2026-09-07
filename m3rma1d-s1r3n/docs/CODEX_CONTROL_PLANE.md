@@ -1,116 +1,73 @@
-# Codex-to-Core Production Control-Plane Contract
+# Codex-to-S3-CAM Production Control-Plane Contract
 
-The Codex host sends authenticated JSON requests to the Core ESP32-S3. Every request and response is HMAC-SHA256 authenticated. The Core must reject unsigned, stale, replayed, malformed, or incorrectly routed requests before inspecting the payload.
-
-## Request envelope
-
-```json
-{
-  "version": 1,
-  "type": "job.execute",
-  "timestamp": "2026-09-01T12:00:00.000Z",
-  "nonce": "32-lowercase-hex-characters",
-  "route": {
-    "logical_target": "flipper",
-    "physical_owner": "deck-cyd",
-    "fallback_physical_route": false
-  },
-  "payload": {},
-  "signature": "64-lowercase-hex-characters"
-}
-```
-
-The signature is HMAC-SHA256 over the deterministic recursively key-sorted JSON representation with the `signature` field removed. `S1R3N_CONTROL_KEY` must contain at least 32 random characters and must be provisioned outside source control.
-
-## Response envelope
-
-```json
-{
-  "version": 1,
-  "type": "job.execute.result",
-  "timestamp": "2026-09-01T12:00:01.000Z",
-  "request_nonce": "the-request-nonce",
-  "route": {
-    "logical_target": "flipper",
-    "physical_owner": "deck-cyd",
-    "fallback_physical_route": false
-  },
-  "payload": {
-    "job_id": "run-id:0",
-    "code": 0,
-    "text": "completed",
-    "data": {}
-  },
-  "signature": "64-lowercase-hex-characters"
-}
-```
-
-The host verifies the response type, request nonce, timestamp, route, payload shape, and HMAC before using the result.
-
-## Required Core endpoints
+The active M3rMa1d S1r3n appliance has exactly two devices:
 
 ```text
-POST /v1/jobs             job.execute
-POST /v1/approvals        approval.request
-POST /v1/inventory        inventory.request
-POST /v1/status           status.request
-POST /v1/stop             stop.assert
-POST /v1/resume           stop.clear
-POST /v1/artifacts/begin  artifact.begin
-POST /v1/artifacts/chunk  artifact.chunk
-POST /v1/artifacts/commit artifact.commit
+Codex/ADL host -> GOOUUU ESP32-S3-CAM V1.5 N16R8 -> Flipper Zero
 ```
 
-## Core validation order
+There is no CYD, C3/C5 safety mesh, second S3, separate Core board, separate Vision board, or fallback ESP route.
 
-1. Enforce request-size and JSON-depth limits.
-2. Require `version=1` and a known message type.
-3. Require `logical_target=flipper`, `physical_owner=deck-cyd`, and `fallback_physical_route=false`.
-4. Reject timestamps outside the configured clock-skew window.
-5. Reject nonces already observed within the replay-cache lifetime.
-6. Verify HMAC in constant time.
-7. Require the identified CYD Deck online.
-8. Require the Flipper online through that Deck.
-9. Require all three ESP32-C5 safety nodes online and a healthy quorum.
-10. Require STOP clear for execution and approval operations.
-11. Require the ADL run and job leases unexpired.
-12. Verify the materialized Flipper program SHA-256 and adapter verification status.
-13. Verify each referenced artifact is completely staged and matches its expected size and SHA-256.
-14. Re-check risk, authorization, approval lease, frequency profile, asset identity, and target.
-15. Forward only the typed Flipper program to the CYD. Never forward model text, shell input, raw CLI, or an alternate route.
-16. Sign the structured response and record the event.
+## Authentication and route
 
-## Artifact transfer
-
-Artifacts are transferred in signed chunks:
-
-1. `artifact.begin` declares the ID, kind, total size, and full SHA-256.
-2. Core returns a unique upload ID and bounded chunk size.
-3. Each `artifact.chunk` includes offset, base64 data, and chunk SHA-256.
-4. Core rejects gaps, overlaps, duplicate offsets with different bytes, oversized chunks, and digest mismatches.
-5. `artifact.commit` succeeds only after exact byte count and full SHA-256 verification.
-6. A committed artifact remains content-addressed and read-only for the duration of the ADL run.
-
-## Approval lease
-
-A positive CYD response must contain:
+Every normal host request and S3 response uses an HMAC-SHA256 envelope. The HMAC key is provisioned outside source control and must contain at least 32 random characters. The route is fixed:
 
 ```json
 {
-  "job_id": "run-id:0",
-  "approved": true,
-  "approval_id": "unique-approval-id",
-  "expires_at": "2026-09-01T12:00:20.000Z",
-  "physical_owner": "deck-cyd"
+  "logical_target": "flipper",
+  "physical_owner": "s3-cam",
+  "fallback_physical_route": false
 }
 ```
 
-Approval is bound to one job, one program digest, one operator decision, and a short expiration. It cannot be reused for another job.
+The signature is HMAC-SHA256 over the recursively key-sorted JSON representation with the `signature` field removed. The S3 verifies the envelope before inspecting job/artifact payload semantics. Successful and operational-error responses are correlated to the request nonce and signed before the host accepts them.
 
-## Transport requirement
+## Required endpoints
 
-Use HTTPS in production. Plain HTTP is accepted by the host only when explicitly enabled and only for private or local addresses during controlled commissioning. Network isolation is not a substitute for message authentication.
+| Endpoint | Envelope type | Purpose |
+|---|---|---|
+| `POST /v1/status` | `status.request` | Attest route, link state, camera state, STOP, and disabled raw-shell surfaces. |
+| `POST /v1/inventory` | `inventory.request` | Return live Flipper app inventory once typed protobuf RPC inventory is available. Until then this fails closed. |
+| `POST /v1/jobs` | `job.execute` | Execute a content-addressed typed Flipper program. General operations fail closed until protobuf RPC is implemented. |
+| `POST /v1/approvals` | `approval.request` | Correlate the host point-click approval surface with the S3 route. |
+| `POST /v1/stop` | `stop.assert` | Assert local fail-closed STOP. |
+| `POST /v1/resume` | `stop.clear` | Clear STOP only while the Flipper link is live. |
+| `POST /v1/artifacts/begin` | `artifact.begin` | Declare a bounded content-addressed artifact upload. |
+| `POST /v1/artifacts/chunk` | `artifact.chunk` | Append a sequential base64 chunk after per-chunk SHA-256 verification. |
+| `POST /v1/artifacts/commit` | `artifact.commit` | Commit only after exact size and full SHA-256 verification. |
+
+## Request validation
+
+The S3 performs these checks before any job is allowed to act on the Flipper:
+
+1. Require a provisioned control key and `x-s1r3n-protocol: 1`.
+2. Enforce the request-size and JSON nesting limits.
+3. Require the exact seven-field envelope and exact three-field route.
+4. Require `version=1`, the endpoint-specific message type, a 32-hex nonce, and 64-hex HMAC.
+5. Require `logical_target=flipper`, `physical_owner=s3-cam`, and `fallback_physical_route=false`.
+6. Verify HMAC in constant time over canonical JSON.
+7. Parse the signed UTC timestamp and enforce the 30-second clock-skew window.
+8. Reject a nonce already present in the replay cache. A bounded nonce window and timestamp high-water mark are retained in NVS to cover reboot replay attempts.
+9. Require STOP clear and a live Flipper link for job execution.
+10. Require the materialized Flipper program SHA-256 to match its canonical content.
+11. Permit only explicitly implemented typed operations. Unsupported operations fail closed; no model text, shell command, or raw CLI string is forwarded.
+
+The S3 has no trusted RTC during isolated AP commissioning. The first valid HMAC-authenticated host timestamp anchors monotonic time for the boot. NVS high-water and recent nonce state reject older/replayed signed requests across reboot. Once anchored, every later request must remain inside the configured skew window.
+
+## Artifact integrity
+
+Only one bounded upload is active at a time. `artifact.begin` fixes ID, kind, size, and final SHA-256. Chunks must be sequential, within the negotiated size, valid base64, and match their declared chunk SHA-256. Commit requires exact byte count and full-file SHA-256. Committed files are stored under their content hash.
+
+## STOP behavior
+
+STOP defaults asserted at boot and automatically reasserts when the Flipper link becomes stale. Resume succeeds only while the live link is present. Status and STOP assertion remain available independently of the typed RPC execution gate.
+
+## Flipper execution boundary
+
+The current S3 firmware retains a small bounded commissioning-only read-only CLI probe for device identity. That probe is not the production RPC bridge and is not presented as one. Live app inventory plus system/storage/app/GUI/GPIO/property operations remain blocked until the official Flipper Expansion protocol is used to start a protobuf RPC session and those typed services are implemented.
+
+The production adapter catalog remains `flipper-expansion-rpc-v1`; no unrestricted CLI or alternate physical route may be introduced to make tests pass.
 
 ## Verification
 
-The repository contains deterministic envelope tests and a separate real-hardware contract. The real-hardware contract requires a reachable Core and validates the signed route, CYD, Flipper, three-C5 quorum, real inventory, and optionally one read-only device-information execution. It does not use a mock Core.
+Deterministic host tests cover all route/type bindings, signed non-2xx responses, schema ownership, and firmware contract drift. The PlatformIO workflow compiles the actual S3 source and LittleFS image. Real hardware remains required for camera, UART, STOP/replay/tamper/cable-loss/reboot, live inventory, app lifecycle, and typed RPC acceptance.
