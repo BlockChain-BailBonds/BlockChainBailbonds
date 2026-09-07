@@ -25,6 +25,24 @@ typedef enum {
     MermaidMsgReadyRequest = 10,
 } MermaidMsgType;
 
+typedef enum {
+    MermaidActionTransportPing = 1,
+    MermaidActionSystemDeviceInfo = 10,
+    MermaidActionSystemPowerInfo = 11,
+    MermaidActionStorageInfo = 20,
+    MermaidActionStorageList = 21,
+    MermaidActionStorageStat = 22,
+    MermaidActionAppStart = 30,
+    MermaidActionAppExit = 31,
+    MermaidActionAppLoadFile = 32,
+    MermaidActionGuiInput = 40,
+    MermaidActionGpioRead = 50,
+    MermaidActionPropertyGet = 60,
+    MermaidActionRfTransmitOwnedProfile = 70,
+    MermaidActionCredentialReference = 80,
+    MermaidActionAuthValidateOnce = 90,
+} MermaidActionId;
+
 typedef struct {
     bool codex_linked;
     bool s3_linked;
@@ -49,6 +67,12 @@ typedef struct MermaidLink MermaidLink;
 typedef void (*MermaidStatusCallback)(const MermaidRemoteStatus* status, void* context);
 typedef void (*MermaidCatalogCallback)(const MermaidCatalogSummary* catalog, void* context);
 typedef void (*MermaidResultCallback)(uint32_t job_id, int16_t code, const char* text, void* context);
+typedef void (*MermaidActionCallback)(
+    uint32_t job_id,
+    uint16_t action_id,
+    const char* argument,
+    void* context);
+typedef void (*MermaidStopCallback)(uint32_t job_id, void* context);
 
 MermaidLink* mermaid_link_alloc(void);
 void mermaid_link_free(MermaidLink* link);
@@ -58,12 +82,19 @@ void mermaid_link_set_callbacks(
     MermaidStatusCallback status_cb,
     MermaidCatalogCallback catalog_cb,
     MermaidResultCallback result_cb,
+    MermaidActionCallback action_cb,
+    MermaidStopCallback stop_cb,
     void* context);
 void mermaid_link_poll(MermaidLink* link);
 bool mermaid_link_request_status(MermaidLink* link);
 bool mermaid_link_request_catalog(MermaidLink* link);
 bool mermaid_link_request_ready(MermaidLink* link);
 bool mermaid_link_send_stop(MermaidLink* link, uint32_t job_id);
+bool mermaid_link_send_action_result(
+    MermaidLink* link,
+    uint32_t job_id,
+    int16_t code,
+    const char* text);
 
 #ifdef __cplusplus
 }
