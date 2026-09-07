@@ -9,12 +9,16 @@ on:
       - 'm3rma1d-s1r3n/adl/**'
       - 'm3rma1d-s1r3n/codex/**'
       - 'm3rma1d-s1r3n/data/**'
+      - 'm3rma1d-s1r3n/src/**'
+      - 'm3rma1d-s1r3n/include/**'
       - '.github/workflows/m3rma1d-codex.yml'
   pull_request:
     paths:
       - 'm3rma1d-s1r3n/adl/**'
       - 'm3rma1d-s1r3n/codex/**'
       - 'm3rma1d-s1r3n/data/**'
+      - 'm3rma1d-s1r3n/src/**'
+      - 'm3rma1d-s1r3n/include/**'
       - '.github/workflows/m3rma1d-codex.yml'
   workflow_dispatch:
     inputs:

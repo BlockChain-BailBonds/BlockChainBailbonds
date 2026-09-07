@@ -16,7 +16,7 @@ namespace m3rma1d {
 namespace {
 
 constexpr size_t PERSISTED_NONCES = 16;
-constexpr char HEX[] = "0123456789abcdef";
+constexpr char HEX_DIGITS[] = "0123456789abcdef";
 
 bool is_lower_hex(const String& value, size_t length) {
     if(value.length() != length) return false;
@@ -80,8 +80,8 @@ String bytes_to_hex(const uint8_t* bytes, size_t length) {
     String out;
     out.reserve(length * 2);
     for(size_t i = 0; i < length; ++i) {
-        out += HEX[(bytes[i] >> 4) & 0x0f];
-        out += HEX[bytes[i] & 0x0f];
+        out += HEX_DIGITS[(bytes[i] >> 4) & 0x0f];
+        out += HEX_DIGITS[bytes[i] & 0x0f];
     }
     return out;
 }
