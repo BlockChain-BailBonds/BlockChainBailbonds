@@ -128,6 +128,14 @@ static void dispatch_action_request(MermaidLink* link, const MermaidFrame* frame
         return;
     }
 
+    if(action_id == MermaidActionSystemDeviceInfo) {
+        if(arg_len) {
+            mermaid_link_send_action_result(link, job_id, -13, "unexpected argument");
+        } else {
+            mermaid_link_send_action_result(link, job_id, 0, "Flipper Zero; M3rMa1d FAP; link=2");
+        }
+        return;
+    }
     if(action_id == MermaidActionTransportPing) {
         mermaid_link_send_action_result(link, job_id, 0, "ok:mermaid-link-v2");
         return;
