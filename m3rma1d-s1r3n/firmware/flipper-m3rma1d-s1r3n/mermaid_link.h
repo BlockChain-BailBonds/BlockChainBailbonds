@@ -26,8 +26,7 @@ typedef enum {
 } MermaidMsgType;
 
 typedef enum {
-    MermaidActionTransportPing = 1,
-    MermaidActionSystemDeviceInfo = 10,
+    MermaidActionSystemDeviceInfo = 1,
     MermaidActionSystemPowerInfo = 11,
     MermaidActionStorageInfo = 20,
     MermaidActionStorageList = 21,
@@ -41,6 +40,7 @@ typedef enum {
     MermaidActionRfTransmitOwnedProfile = 70,
     MermaidActionCredentialReference = 80,
     MermaidActionAuthValidateOnce = 90,
+    MermaidActionTransportPing = 100,
 } MermaidActionId;
 
 typedef struct {
