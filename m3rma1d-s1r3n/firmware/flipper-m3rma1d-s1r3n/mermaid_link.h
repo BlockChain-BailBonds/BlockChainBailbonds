@@ -78,9 +78,11 @@ void mermaid_link_set_callbacks(
     MermaidStatusCallback status_cb,
     MermaidCatalogCallback catalog_cb,
     MermaidResultCallback result_cb,
-    MermaidActionCallback action_cb,
-    MermaidStopCallback stop_cb,
     void* context);
+void mermaid_link_set_action_callbacks(
+    MermaidLink* link,
+    MermaidActionCallback action_cb,
+    MermaidStopCallback stop_cb);
 void mermaid_link_poll(MermaidLink* link);
 bool mermaid_link_request_status(MermaidLink* link);
 bool mermaid_link_request_catalog(MermaidLink* link);
