@@ -26,6 +26,8 @@ struct MermaidLink {
     uint8_t rx_accum[RX_ACCUM_SIZE];
     size_t rx_len;
     uint32_t next_seq;
+    uint32_t last_rx_seq;
+    bool have_rx_seq;
     bool expansion_owned;
     MermaidStatusCallback status_cb;
     MermaidCatalogCallback catalog_cb;
@@ -66,6 +68,24 @@ static uint32_t crc32(const uint8_t* data, size_t length) {
         }
     }
     return ~crc;
+}
+
+static bool seq_newer(uint32_t seq, uint32_t previous) {
+    return (int32_t)(seq - previous) > 0;
+}
+
+static bool recognized_frame_type(uint8_t type) {
+    switch(type) {
+    case MermaidMsgHello:
+    case MermaidMsgStatus:
+    case MermaidMsgCatalog:
+    case MermaidMsgActionRequest:
+    case MermaidMsgActionResult:
+    case MermaidMsgStop:
+        return true;
+    default:
+        return false;
+    }
 }
 
 static void serial_rx_callback(
@@ -236,8 +256,16 @@ static bool decode_one(MermaidLink* link) {
             .seq = read_u32(&link->rx_accum[4]),
             .length = length,
         };
-        if(length) memcpy(frame.payload, &link->rx_accum[HEADER_SIZE], length);
-        dispatch_frame(link, &frame);
+        const bool explicit_session_reset = frame.type == MermaidMsgHello && frame.seq == 1U;
+        const bool fresh_seq = !link->have_rx_seq || seq_newer(frame.seq, link->last_rx_seq) || explicit_session_reset;
+        if(recognized_frame_type(frame.type) && fresh_seq) {
+            link->have_rx_seq = true;
+            link->last_rx_seq = frame.seq;
+            if(length) memcpy(frame.payload, &link->rx_accum[HEADER_SIZE], length);
+            dispatch_frame(link, &frame);
+        } else if(recognized_frame_type(frame.type)) {
+            FURI_LOG_W(TAG, "Replay/out-of-order frame dropped");
+        }
     } else {
         FURI_LOG_W(TAG, "CRC mismatch");
     }

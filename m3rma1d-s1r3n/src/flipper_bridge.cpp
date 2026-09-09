@@ -42,14 +42,25 @@ uint32_t crc32(const uint8_t* data, size_t length) {
     }
     return ~crc;
 }
+
+bool seq_newer(uint32_t seq, uint32_t previous) {
+    return static_cast<int32_t>(seq - previous) > 0;
 }
+
+bool recognized_inbound_type(uint8_t type) {
+    return type == MSG_HELLO || type == MSG_ACTION_RESULT || type == MSG_STOP;
+}
+} // namespace
 
 void FlipperBridge::begin() {
     serial_.begin(FLIPPER_BAUD, SERIAL_8N1, FLIPPER_RX_GPIO, FLIPPER_TX_GPIO);
     stop_asserted_ = true;
     seen_rx_ = false;
+    have_rx_seq_ = false;
     rx_len_ = 0;
     last_rx_ms_ = 0;
+    last_rx_seq_ = 0;
+    next_seq_ = 1;
     const uint8_t hello[2] = {'S', '3'};
     send_frame(MSG_HELLO, hello, sizeof(hello));
 }
@@ -57,15 +68,17 @@ void FlipperBridge::begin() {
 void FlipperBridge::read_serial() {
     while(serial_.available() && rx_len_ < sizeof(rx_)) {
         rx_[rx_len_++] = static_cast<uint8_t>(serial_.read());
-        seen_rx_ = true;
-        last_rx_ms_ = millis();
     }
-    if(rx_len_ == sizeof(rx_)) rx_len_ = 0;
 }
 
 void FlipperBridge::poll() {
     read_serial();
     while(decode_one(nullptr, 0)) {}
+    if(rx_len_ == sizeof(rx_)) {
+        // A full accumulator that the decoder could not advance is not proof of
+        // a live peer. Drop it and remain fail-closed rather than trusting noise.
+        rx_len_ = 0;
+    }
     if(!linked()) stop_asserted_ = true;
 }
 
@@ -89,6 +102,7 @@ bool FlipperBridge::send_frame(uint8_t type, const uint8_t* payload, uint16_t le
 
 bool FlipperBridge::decode_one(FlipperResult* awaited, uint32_t awaited_job_id) {
     if(rx_len_ < HEADER_SIZE + CRC_SIZE) return false;
+
     size_t start = 0;
     while(start + 1 < rx_len_ && !(rx_[start] == MAGIC0 && rx_[start + 1] == MAGIC1)) ++start;
     if(start) {
@@ -96,40 +110,56 @@ bool FlipperBridge::decode_one(FlipperResult* awaited, uint32_t awaited_job_id) 
         rx_len_ -= start;
         return true;
     }
+
     if(rx_[2] != MERMAID_LINK_VERSION) {
         memmove(rx_, rx_ + 2, rx_len_ - 2);
         rx_len_ -= 2;
         return true;
     }
+
     const uint16_t length = read_u16(&rx_[8]);
     if(length > MERMAID_LINK_MAX_PAYLOAD) {
         memmove(rx_, rx_ + 2, rx_len_ - 2);
         rx_len_ -= 2;
         return true;
     }
+
     const size_t frame_size = HEADER_SIZE + length + CRC_SIZE;
     if(rx_len_ < frame_size) return false;
+
     const uint32_t expected = read_u32(&rx_[HEADER_SIZE + length]);
     const uint32_t actual = crc32(&rx_[2], HEADER_SIZE - 2 + length);
     if(expected == actual) {
         const uint8_t type = rx_[3];
-        const uint8_t* payload = &rx_[HEADER_SIZE];
-        if(type == MSG_HELLO) {
+        const uint32_t seq = read_u32(&rx_[4]);
+        const bool explicit_session_reset = type == MSG_HELLO && seq == 1U;
+        const bool fresh_seq = !have_rx_seq_ || seq_newer(seq, last_rx_seq_) || explicit_session_reset;
+
+        // CRC proves frame integrity, not peer identity. Only protocol messages
+        // this bridge actually understands may refresh link liveness.
+        if(recognized_inbound_type(type) && fresh_seq) {
+            have_rx_seq_ = true;
+            last_rx_seq_ = seq;
             seen_rx_ = true;
             last_rx_ms_ = millis();
-        } else if(type == MSG_STOP) {
-            stop_asserted_ = true;
-        } else if(type == MSG_ACTION_RESULT && awaited && length >= 6) {
-            const uint32_t job_id = read_u32(payload);
-            if(job_id == awaited_job_id) {
-                awaited->job_id = job_id;
-                awaited->code = static_cast<int16_t>(read_u16(payload + 4));
-                const size_t text_len = min<size_t>(length - 6, MERMAID_LINK_MAX_PAYLOAD - 6);
-                awaited->text = "";
-                for(size_t i = 0; i < text_len; ++i) awaited->text += static_cast<char>(payload[6 + i]);
+
+            const uint8_t* payload = &rx_[HEADER_SIZE];
+            if(type == MSG_STOP) {
+                // STOP is deliberately fail-closed. Any valid, fresh STOP frame asserts it.
+                stop_asserted_ = true;
+            } else if(type == MSG_ACTION_RESULT && awaited && length >= 6) {
+                const uint32_t job_id = read_u32(payload);
+                if(job_id == awaited_job_id) {
+                    awaited->job_id = job_id;
+                    awaited->code = static_cast<int16_t>(read_u16(payload + 4));
+                    const size_t text_len = min<size_t>(length - 6, MERMAID_LINK_MAX_PAYLOAD - 6);
+                    awaited->text = "";
+                    for(size_t i = 0; i < text_len; ++i) awaited->text += static_cast<char>(payload[6 + i]);
+                }
             }
         }
     }
+
     memmove(rx_, rx_ + frame_size, rx_len_ - frame_size);
     rx_len_ -= frame_size;
     return true;
@@ -176,11 +206,13 @@ bool FlipperBridge::execute(
         while(decode_one(&result, job_id)) {
             if(result.code != -1) return result.code == 0;
         }
+        if(rx_len_ == sizeof(rx_)) rx_len_ = 0;
         if(stop_asserted_) { result.code = -10; result.text = "STOP asserted"; return false; }
+        if(!linked()) { result.code = -11; result.text = "Flipper offline"; return false; }
         delay(1);
     }
     result.code = -14;
     result.text = "Flipper response timeout";
     return false;
 }
-}
+} // namespace m3rma1d

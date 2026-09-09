@@ -85,6 +85,13 @@ static void result_callback(uint32_t job_id, int16_t code, const char* text, voi
     }
 }
 
+static void stop_callback(uint32_t job_id, void* context) {
+    MermaidApp* app = context;
+    app->stop_asserted = true;
+    app->last_job_id = job_id;
+    set_event(app, "stop.remote");
+}
+
 static const char* page_name(MermaidPage page) {
     switch(page) {
     case PageHome: return "COMMAND DECK";
@@ -287,6 +294,7 @@ int32_t m3rma1d_s1r3n_app(void* p) {
     app->link = mermaid_link_alloc();
     furi_check(app->link);
     mermaid_link_set_callbacks(app->link, status_callback, catalog_callback, result_callback, app);
+    mermaid_link_set_action_callbacks(app->link, NULL, stop_callback);
     if(mermaid_link_is_open(app->link)) {
         mermaid_link_request_status(app->link);
     } else {

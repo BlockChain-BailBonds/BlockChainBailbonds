@@ -53,7 +53,9 @@ private:
     HardwareSerial& serial_;
     uint32_t last_rx_ms_ = 0;
     uint32_t next_seq_ = 1;
+    uint32_t last_rx_seq_ = 0;
     bool seen_rx_ = false;
+    bool have_rx_seq_ = false;
     bool stop_asserted_ = true;
     uint8_t rx_[256] = {};
     size_t rx_len_ = 0;
