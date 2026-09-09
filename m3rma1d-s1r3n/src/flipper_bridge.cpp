@@ -8,9 +8,12 @@ namespace {
 constexpr uint8_t MAGIC0 = 'M';
 constexpr uint8_t MAGIC1 = '3';
 constexpr uint8_t MSG_HELLO = 1;
+constexpr uint8_t MSG_STATUS_REQUEST = 2;
+constexpr uint8_t MSG_CATALOG_REQUEST = 4;
 constexpr uint8_t MSG_ACTION_REQUEST = 6;
 constexpr uint8_t MSG_ACTION_RESULT = 7;
 constexpr uint8_t MSG_STOP = 8;
+constexpr uint8_t MSG_READY_REQUEST = 10;
 constexpr size_t HEADER_SIZE = 10;
 constexpr size_t CRC_SIZE = 4;
 
@@ -48,7 +51,17 @@ bool seq_newer(uint32_t seq, uint32_t previous) {
 }
 
 bool recognized_inbound_type(uint8_t type) {
-    return type == MSG_HELLO || type == MSG_ACTION_RESULT || type == MSG_STOP;
+    switch(type) {
+    case MSG_HELLO:
+    case MSG_STATUS_REQUEST:
+    case MSG_CATALOG_REQUEST:
+    case MSG_ACTION_RESULT:
+    case MSG_STOP:
+    case MSG_READY_REQUEST:
+        return true;
+    default:
+        return false;
+    }
 }
 } // namespace
 
@@ -135,8 +148,8 @@ bool FlipperBridge::decode_one(FlipperResult* awaited, uint32_t awaited_job_id) 
         const bool explicit_session_reset = type == MSG_HELLO && seq == 1U;
         const bool fresh_seq = !have_rx_seq_ || seq_newer(seq, last_rx_seq_) || explicit_session_reset;
 
-        // CRC proves frame integrity, not peer identity. Only protocol messages
-        // this bridge actually understands may refresh link liveness.
+        // Only CRC-valid, correctly-versioned, expected-direction MermaidLink
+        // traffic refreshes liveness. Random bytes and stale/replayed frames do not.
         if(recognized_inbound_type(type) && fresh_seq) {
             have_rx_seq_ = true;
             last_rx_seq_ = seq;
