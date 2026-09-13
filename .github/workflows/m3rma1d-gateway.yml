@@ -1,0 +1,32 @@
+name: M3rMa1d S1r3n Gateway
+
+on:
+  push:
+    branches:
+      - feat/m3rma1d-s1r3n-integrated-firmware
+      - main
+    paths:
+      - 'm3rma1d-s1r3n/gateway/**'
+      - 'm3rma1d-s1r3n/adl/app-registry.mjs'
+      - '.github/workflows/m3rma1d-gateway.yml'
+  pull_request:
+    paths:
+      - 'm3rma1d-s1r3n/gateway/**'
+      - 'm3rma1d-s1r3n/adl/app-registry.mjs'
+      - '.github/workflows/m3rma1d-gateway.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Test catalog bridge
+        run: node m3rma1d-s1r3n/gateway/catalog-summary.test.mjs

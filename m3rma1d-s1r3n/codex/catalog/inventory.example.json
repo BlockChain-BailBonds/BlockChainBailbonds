@@ -1,0 +1,13 @@
+{
+  "inventory_version":"1.0",
+  "updated_at":"2026-09-01T00:00:00Z",
+  "nodes": [
+    {"id":"core-s3","role":"core","hardware":"GOOUUU ESP32-S3-CAM V1.5 N16R8 without camera","online":false},
+    {"id":"vision-s3","role":"vision","hardware":"GOOUUU ESP32-S3-CAM V1.5 N16R8 with OV3660","online":false},
+    {"id":"deck-cyd","role":"flipper_bridge","hardware":"ESP32-32E N4 CYD 2.8 inch","online":false},
+    {"id":"c5-1","role":"safety","hardware":"ESP32-C5 SuperMini","online":false},
+    {"id":"c5-2","role":"telemetry","hardware":"ESP32-C5 SuperMini","online":false},
+    {"id":"c5-3","role":"recovery","hardware":"ESP32-C5 SuperMini","online":false}
+  ],
+  "flipper": {"online":false,"physical_owner":"deck-cyd","apps":[]}
+}

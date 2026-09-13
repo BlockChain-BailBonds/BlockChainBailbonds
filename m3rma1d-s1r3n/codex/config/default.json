@@ -1,0 +1,46 @@
+{
+  "service": {
+    "name": "M3rMa1d S1r3n Codex",
+    "version": "1.0.0-rc.2",
+    "bind_host": "127.0.0.1",
+    "bind_port": 9183,
+    "request_body_limit": 262144
+  },
+  "openai": {
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-5.6",
+    "store": false,
+    "reasoning_effort": "high",
+    "timeout_ms": 120000
+  },
+  "execution": {
+    "max_concurrent_runs": 1,
+    "max_run_ms": 600000,
+    "physical_owner": "s3-cam",
+    "require_flipper_online": true,
+    "allow_fallback_physical_route": false
+  },
+  "policy": {
+    "allow_generated_adapter_execution": true,
+    "require_vision_for_generated_high_risk_adapters": true,
+    "machine_verify_max_risk": "local_state"
+  },
+  "artifacts": {
+    "allow_network": false,
+    "max_bytes": 1048576,
+    "allowed_hosts": [
+      "raw.githubusercontent.com",
+      "github.com"
+    ]
+  },
+  "transport": {
+    "core_url": "",
+    "timeout_ms": 15000,
+    "clock_skew_ms": 30000,
+    "allow_insecure_local_http": false
+  },
+  "approvals": {
+    "timeout_ms": 60000
+  },
+  "region_profile": "US-LAB"
+}

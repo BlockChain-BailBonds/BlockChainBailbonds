@@ -1,40 +1,9 @@
-# BlockChainBailbonds
-.....
-918-tech-blockchain-bailbonds-mvp-final/
-│
-├── README.md                # Overview, setup, usage, deployment
-├── LICENSE                  # License (MIT, Apache 2.0, etc.)
-├── package.json             # If using Node.js for build or dependency management
-├── .gitignore               # Ignore node_modules, build, etc.
-│
-├── /src                     # Source files
-│   ├── /js
-│   │   ├── bondsman-actions.js
-│   │   ├── contract-generator.js
-│   │   ├── domain-connector.js
-│   │   ├── ipfs-storage.js
-│   │   ├── oklahoma-data.js
-│   │   ├── script.js
-│   │   ├── service-worker.js
-│   │   ├── translations.js
-│   │   └── ...
-│   ├── /html
-│   │   ├── index.html
-│   │   ├── bail-contract-generator.html
-│   │   ├── bondsman-portal.html
-│   │   ├── domain-structure.html
-│   │   ├── domain-wizard.html
-│   │   ├── offline.html
-│   │   ├── verification.html
-│   │   └── ...
-│   ├── /css
-│   │   └── style.css
-│   └── /data
-│       └── manifest.json
-│
-├── /public                  # Deployed static assets
-│   ├── /icons
-│   └── favicon.ico
-│
-└── /docs                    # Documentation, screenshots, API spec, architecture notes
-    └── architecture.md
+# M3rMa1d S1r3n — 918 Technologies
+
+This repository's active hardware project is **M3rMa1d S1r3n**, a point-and-click Codex/ADL automation platform using exactly one **ESP32-S3 N16R8 CAM** as the hardware controller for a Flipper Zero.
+
+The active implementation lives in [`m3rma1d-s1r3n/`](m3rma1d-s1r3n/). It consolidates camera, web UI, Flipper bridge, STOP/telemetry and hardware orchestration onto the single S3-CAM. Codex runs as the companion host service and treats the Flipper as a typed tool: installed apps are inventoried, new apps trigger adapter generation, eligible adapters are device-tested, and verified functions are surfaced as point-and-click actions.
+
+No CYD, second ESP32-S3, C3/C5 node, or fallback ESP hardware route is part of the active M3rMa1d S1r3n architecture.
+
+See [`m3rma1d-s1r3n/README.md`](m3rma1d-s1r3n/README.md) for wiring, flashing, Codex configuration, ADL behavior, and the point-and-click workflow.

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M3rMa1d Vision Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "confidence", "reason"],
+  "properties": {
+    "decision": {"type": "string", "enum": ["continue", "retry", "abort", "request_operator"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "reason": {"type": "string", "maxLength": 256},
+    "next_action": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+        "function": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+        "arguments": {"type": "object", "maxProperties": 16}
+      }
+    }
+  }
+}

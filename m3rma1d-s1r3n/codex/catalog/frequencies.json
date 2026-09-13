@@ -1,0 +1,14 @@
+{
+  "frequency_catalog_version":"1.0",
+  "regions": {
+    "US-LAB": {
+      "description":"Operator-owned equipment or shielded/isolated laboratory only",
+      "profiles": {
+        "ir.consumer.38khz":{"medium":"infrared","carrier_hz":38000,"modes":["transmit"],"approval":"deck"},
+        "subghz.receive.user_defined":{"medium":"subghz","modes":["receive"],"requires_frequency_hz":true,"approval":"auto"},
+        "subghz.transmit.user_defined":{"medium":"subghz","modes":["transmit"],"requires_frequency_hz":true,"requires_asset_allowlist":true,"approval":"deck"}
+      }
+    }
+  },
+  "assets": {}
+}
