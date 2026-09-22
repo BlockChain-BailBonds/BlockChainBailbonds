@@ -1,0 +1,7 @@
+.worktrees/
+.superpowers/
+local.properties
+**/build/
+.gradle/
+keystore.properties
+*.jks
