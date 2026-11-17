@@ -29,3 +29,7 @@ Copyright protects qualifying original expression and source implementation, **n
 **Verified locally:** automated tests of schedule logic, QR token privacy, access denials, SMS provider-mock gate, Twilio webhook authorization, Stripe webhook signature verification, single-use download, expiration, and unsafe QR rejection.
 
 **Unverified / blocked:** live payment collection, live SMS delivery, public HTTPS deployment, end-to-end phone calls through a carrier, authentic mobile installation, privacy penetration test, and real-world telecom cost sustainability.
+
+## Download control / operator decision
+
+A successful Cash App Pay-enabled merchant checkout, where available, is verified using a cryptographically authenticated payment provider event. A restricted Codex audit step and an independent, human Approve/Deny action precede issuance of a QR Call release credential. The operator notification is advisory and not a bearer authorization; the actual release decision requires an authenticated owner session and CSRF validation. Denial voids an unredeemed download credential. No wallet funds may be moved by the Codex review credential.
