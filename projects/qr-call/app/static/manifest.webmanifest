@@ -1,0 +1,14 @@
+{
+  "id": "/login",
+  "name": "QR Call — 918 Technologies",
+  "short_name": "QR Call",
+  "description": "Revocable QR calling permissions. Owner activation requires independent SMS verification.",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0e16",
+  "theme_color": "#0b0e16",
+  "icons": [
+    {"src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}

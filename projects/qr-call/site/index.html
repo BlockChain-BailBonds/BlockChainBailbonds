@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0e16">
+  <meta name="description" content="QR Call by 918 Technologies: private phone access through revocable, time-restricted QR permissions.">
+  <title>QR Call | 918 Technologies</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">918</span><span>QR CALL</span><span class="tag">GLYPHMATICS</span></div>
+    <a href="https://github.com/BlockChain-BailBonds/BlockChainbailbonds" rel="noopener noreferrer" style="color:#eac47e">View public project</a>
+  </header>
+  <main class="layout">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">STRUCTURED QR PERMISSION SYSTEM</p>
+        <h1>Your number is private.<br>Your permission is revocable.</h1>
+        <p>Issue an individual QR access credential, limit calling to specific days and hours, and revoke printed paper instantly. Callers contact your existing phone through a privacy gateway; they do not receive your phone number.</p>
+        <p class="footnote">Designed for modern mobile browsers and installable as a web app. Calling needs an internet connection and an authorized telecommunications relay.</p>
+      </div>
+      <div class="hero-art"><span>QR</span><small>ACCESS ≠ NUMBER</small></div>
+    </section>
+    <div class="two-col">
+      <section class="panel">
+        <p class="eyebrow">01 / GATED DELIVERY</p>
+        <h2>One-time activation · Defined lifetime upgrades</h2>
+        <p class="muted">Complete the one-time support purchase through a verified Stripe Checkout. After payment confirmation, a single-use QR is issued for the source/release package. QR previews do not consume it.</p>
+        <button type="button" class="primary full" id="checkout" disabled>Checkout not yet connected</button>
+        <p id="checkout-message" class="footnote" role="status">The payment gateway is not configured on this public page. No payment can be collected here until it is connected.</p>
+        <p class="footnote">Lifetime upgrades apply to the named QR Call core product while it is maintained. Third-party calling minutes, SMS, infrastructure, and major separate products are excluded; see the terms.</p>
+      </section>
+      <section class="panel">
+        <p class="eyebrow">02 / VERIFIED PHONE ACTIVATION</p>
+        <h2>SMS verification before operation</h2>
+        <p class="muted">The owner's QR operations remain locked until the registered destination telephone successfully passes an independent SMS ownership challenge. No code in a QR can bypass phone permissions or execute shell commands.</p>
+        <p class="eyebrow">03 / GLYPHMATICS</p>
+        <h2>Authenticated encryption, not security by obscurity</h2>
+        <p class="muted">GlyphMatics GM1 envelopes protect sensitive stored values using AES-256-GCM with HKDF-SHA-256 key derivation. The platform checks permission state, expiry, schedule, and revocation before connecting a call.</p>
+      </section>
+    </div>
+    <section class="panel">
+      <p class="eyebrow">COMMAND POLICY</p>
+      <h2>A QR is a grant of permission, never executable software</h2>
+      <div class="grid-2">
+        <div><h3>📞 Call</h3><p class="muted">A one-person calling link with date boundaries, recurring access hours, quota and instant revocation.</p></div>
+        <div><h3>📦 Download</h3><p class="muted">A payment-confirmed delivery link expires after 30 minutes, and one successful redemption consumes it.</p></div>
+        <div><h3>🔐 Activate</h3><p class="muted">Registered phone confirmation is required; the browser cannot simply read your telephone number without permission.</p></div>
+        <div><h3>🛑 Revoke</h3><p class="muted">Revoke one printed credential without changing your number or disrupting other printed credentials.</p></div>
+      </div>
+    </section>
+    <footer class="footnote" style="padding-bottom:50px">
+      QR Call concept and implementation © 2026 Matthew Blake Ward, in association with 918 Technologies. The public source is available for inspection subject to its accompanying licensing terms. A public repository is not a secure download gate. Privacy does not imply end-to-end secrecy from the relay provider. This page does not collect money unless a live merchant integration is configured.
+    </footer>
+  </main>
+  <script src="config.js"></script>
+  <script>
+  (() => {
+    'use strict';
+    const button = document.getElementById('checkout');
+    const message = document.getElementById('checkout-message');
+    const value = window.QR_CALL_GATEWAY_ORIGIN;
+    let origin = '';
+    try {
+      const candidate = new URL(value);
+      if (candidate.protocol === 'https:' && !candidate.username && !candidate.password && !candidate.search && !candidate.hash && candidate.pathname === '/') origin = candidate.origin;
+    } catch (_) {}
+    if (!origin) return;
+    button.disabled = false;
+    button.textContent = 'Complete one-time checkout';
+    message.textContent = 'Checkout is handled securely by the merchant gateway. A download QR is issued only after confirmed payment.';
+    button.onclick = async () => {
+      button.disabled = true;
+      message.textContent = 'Requesting verified checkout…';
+      try {
+        const r = await fetch(origin + '/gate/checkout', {method:'POST', mode:'cors', cache:'no-store'});
+        const body = await r.json();
+        if (!r.ok || typeof body.checkout_url !== 'string' || !body.checkout_url.startsWith('https://checkout.stripe.com/')) throw new Error('Verified checkout is unavailable.');
+        location.assign(body.checkout_url);
+      } catch (e) {
+        message.textContent = 'Checkout could not be started. No payment was taken on this page.';
+        button.disabled = false;
+      }
+    };
+  })();
+  </script>
+</body>
+</html>

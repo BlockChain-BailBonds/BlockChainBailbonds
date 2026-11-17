@@ -1,0 +1,70 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        format: raw
+    depends_on:
+      database:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    volumes:
+      - ./private_download:/srv/private_download:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    networks:
+      - internal
+  housekeeping:
+    build: .
+    restart: unless-stopped
+    command: ["sh", "-c", "while true; do python -m app.maintenance; sleep 86400; done"]
+    env_file:
+      - path: .env
+        format: raw
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - internal
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qrcall
+      POSTGRES_USER: qrcall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run 'python -m app.manage configure' first}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qrcall -d qrcall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?configure domain first}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal: {}
+volumes:
+  postgres_data: {}
+  caddy_data: {}
+  caddy_config: {}

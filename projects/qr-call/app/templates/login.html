@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>918 QR Call — Owner sign-in</title><link rel="stylesheet" href="/static/styles.css"><link rel="manifest" href="/static/manifest.webmanifest"><meta name="theme-color" content="#0b0e16"></head>
+<body><main class="login-wrap"><div class="brand"><span class="brand-mark">918</span><span>QR CALL</span></div>
+<section class="panel login-panel"><p class="eyebrow">PRIVATE ACCESS CONSOLE</p><h1>Own your number.<br>Control who can call.</h1>
+<p class="muted">Sign in to manage your personal, revocable QR calling permissions.</p>
+<form action="/login" method="post"><label for="password">Administrator password</label><input type="password" id="password" name="password" autocomplete="current-password" required minlength="12"><button class="primary full" type="submit">Unlock console</button></form>
+{% if message %}<p class="alert" role="alert">{{message}}</p>{% endif %}</section>
+<p class="footnote">918 Technologies · Calls through the gateway only · Your phone number is not displayed on contact pages</p></main><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script></body></html>

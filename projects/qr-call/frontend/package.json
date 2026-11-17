@@ -1,0 +1,9 @@
+{
+  "name": "918-qr-call-voice-browser",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {"build": "esbuild caller.js --bundle --minify --format=esm --target=es2020 --outfile=../app/static/caller.bundle.js"},
+  "dependencies": {"@twilio/voice-sdk": "2.18.5"},
+  "devDependencies": {"esbuild": "0.25.5"}
+}
