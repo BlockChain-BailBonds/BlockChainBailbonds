@@ -1,0 +1,37 @@
+name: QR Call validation
+on:
+  push:
+    paths:
+      - 'projects/qr-call/**'
+      - '.github/workflows/qr-call-ci.yml'
+  pull_request:
+    paths:
+      - 'projects/qr-call/**'
+      - '.github/workflows/qr-call-ci.yml'
+permissions:
+  contents: read
+jobs:
+  unit-and-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/qr-call
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-test.txt
+      - name: Run access, schedule, SMS lock, payment and QR gate tests
+        run: python -m pytest -q
+      - name: Check Python source
+        run: python -m compileall -q app
+      - name: Build reproducible release package and SHA256 record
+        run: python tools/build_release.py
+  build-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build container without any live secrets or deployment
+        run: docker build -t qr-call:ci projects/qr-call
